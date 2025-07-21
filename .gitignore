@@ -1,0 +1,197 @@
+# WordPress Plugin .gitignore
+# ===========================
+
+# WordPress Core Files
+# --------------------
+# Don't include WordPress core files if accidentally copied
+wp-admin/
+wp-includes/
+wp-content/themes/
+wp-content/plugins/
+wp-content/uploads/
+wp-config.php
+wp-config-sample.php
+wp-blog-header.php
+wp-comments-post.php
+wp-cron.php
+wp-links-opml.php
+wp-load.php
+wp-login.php
+wp-mail.php
+wp-settings.php
+wp-signup.php
+wp-trackback.php
+xmlrpc.php
+index.php
+license.txt
+readme.html
+legacy/
+
+# WordPress Uploads and Cache
+# ---------------------------
+uploads/
+cache/
+wp-content/cache/
+wp-content/uploads/
+wp-content/upgrade/
+wp-content/backup-db/
+wp-content/advanced-cache.php
+wp-content/wp-cache-config.php
+
+# Development and Build Files
+# ---------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn-integrity
+package-lock.json
+yarn.lock
+
+dev-tasks-pi/
+dev-tasks-mini-spec/
+tests/
+
+# Compiled CSS and JS
+dist/
+build/
+*.min.css
+*.min.js
+*.map
+
+# SASS/SCSS
+.sass-cache/
+*.css.map
+*.scss.map
+
+# IDE and Editor Files
+# -------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary Files
+# ---------------
+*.tmp
+*.temp
+*.log
+*.bak
+*.backup
+*.old
+*~
+
+# Environment and Configuration
+# ----------------------------
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+wp-config-local.php
+local-config.php
+
+# Database Files
+# --------------
+# *.sql
+*.sqlite
+*.db
+
+# Composer
+# --------
+vendor/
+composer.lock
+
+# PHP
+# ---
+*.php~
+.phpunit.result.cache
+
+# Testing
+# -------
+tests/_output/
+tests/_support/_generated/
+codeception.yml
+
+# Logs
+# ----
+*.log
+logs/
+error_log
+debug.log
+
+# Plugin Specific
+# ---------------
+# Add any plugin-specific files to ignore here
+
+# Backup files
+*.backup
+*.bak
+
+# Temporary plugin files
+plugin-update-checker/
+updater/
+
+# Documentation build files
+docs/_build/
+docs/.doctrees/
+
+# OS Generated Files
+# ------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Security
+# --------
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Archives
+# --------
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# MCP
+# -------
+*.mcp.json
+
+# Claude
+# -------
+#.claude/    
+
+logs
+dev-debug.log
+# Dependency directories
+# Environment variables
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# OS specific
+
+# Task files
+# tasks.json
+# tasks/ 
