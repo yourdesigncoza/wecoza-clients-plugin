@@ -37,17 +37,8 @@ $is_edit = !empty($client['id']);
     <?php endif; ?>
     
     <?php if (!$is_edit) : ?>
-        <div class="my-5 ms-0">
-            <div class="alert alert-discovery" role="alert">
-                <div class="d-flex gap-4">
-                    <span><i class="fa-solid fa-circle-question icon-discovery"></i></span>
-                    <div class="d-flex flex-column gap-2">
-                        <h5 class="mb-0">Create a new Client</h5>
-                        <p class="mb-0">Before you start the upload process ensure you have all info ready.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+            <h4 class="mb-1 mt-4">Create a new Client</h4>
+            <p class="mb-5 text-muted">Before you start the upload process ensure you have all info. ready.</p>
     <?php endif; ?>
     
     <form id="clients-form" class="needs-validation ydcoza-compact-form" novalidate method="POST" enctype="multipart/form-data">
@@ -273,7 +264,7 @@ $is_edit = !empty($client['id']);
         
         <div class="border-top border-opacity-25 border-3 border-discovery my-5 mx-1"></div>
         
-        <h3 style="color:#007bff;">Classes Fields (to be integrated after Classes are finalized)</h3>
+        <p class="mb4 text-muted">Classes Fields (to be integrated after Classes are finalized)</p>
         
         <!-- Class Related Fields -->
         <div class="row">
