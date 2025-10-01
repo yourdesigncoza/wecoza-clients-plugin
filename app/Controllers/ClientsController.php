@@ -75,6 +75,7 @@ class ClientsController {
         $has_capture_form = has_shortcode($post->post_content, 'wecoza_capture_clients');
         $has_display_table = has_shortcode($post->post_content, 'wecoza_display_clients');
         $has_single_display = has_shortcode($post->post_content, 'wecoza_display_single_client');
+        $nonce = wp_create_nonce('wecoza_clients_ajax');
         
         // Enqueue scripts based on shortcode presence
         if ($has_capture_form) {
@@ -87,15 +88,11 @@ class ClientsController {
             );
             
             // Localize script
-            wp_localize_script('wecoza-client-capture', 'wecoza_clients', array(
-                'ajax_url' => admin_url('admin-ajax.php'),
-                'nonce' => wp_create_nonce('wecoza_clients_ajax'),
-                'messages' => array(
-                    'saving' => __('Saving client...', 'wecoza-clients'),
-                    'saved' => __('Client saved successfully!', 'wecoza-clients'),
-                    'error' => __('An error occurred. Please try again.', 'wecoza-clients'),
-                )
-            ));
+            wp_localize_script(
+                'wecoza-client-capture',
+                'wecoza_clients',
+                $this->getLocalizationPayload($nonce)
+            );
         }
         
         if ($has_display_table) {
@@ -116,17 +113,51 @@ class ClientsController {
             );
             
             // Localize script
-            wp_localize_script('wecoza-clients-display', 'wecoza_clients', array(
-                'ajax_url' => admin_url('admin-ajax.php'),
-                'nonce' => wp_create_nonce('wecoza_clients_ajax'),
-                'messages' => array(
-                    'confirm_delete' => __('Are you sure you want to delete this client?', 'wecoza-clients'),
+            $localization = $this->getLocalizationPayload($nonce);
+            wp_localize_script('wecoza-clients-display', 'wecoza_clients', $localization);
+            wp_localize_script('wecoza-client-search', 'wecoza_clients', $localization);
+        }
+    }
+
+    /**
+     * Build localization payload for frontend scripts
+     *
+     * @param string $nonce Nonce value shared across scripts
+     * @param array $overrides Additional data to merge
+     * @return array
+     */
+    protected function getLocalizationPayload($nonce, array $overrides = array()) {
+        $base = array(
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'nonce' => $nonce,
+            'actions' => array(
+                'save' => 'wecoza_save_client',
+                'get' => 'wecoza_get_client',
+                'delete' => 'wecoza_delete_client',
+                'search' => 'wecoza_search_clients',
+                'branches' => 'wecoza_get_branch_clients',
+                'export' => 'wecoza_export_clients',
+            ),
+            'messages' => array(
+                'form' => array(
+                    'saving' => __('Saving client...', 'wecoza-clients'),
+                    'saved' => __('Client saved successfully!', 'wecoza-clients'),
+                    'error' => __('An error occurred. Please try again.', 'wecoza-clients'),
+                ),
+                'list' => array(
+                    'confirmDelete' => __('Are you sure you want to delete this client?', 'wecoza-clients'),
                     'deleting' => __('Deleting client...', 'wecoza-clients'),
                     'deleted' => __('Client deleted successfully!', 'wecoza-clients'),
+                    'exporting' => __('Preparing export...', 'wecoza-clients'),
                     'error' => __('An error occurred. Please try again.', 'wecoza-clients'),
-                )
-            ));
-        }
+                ),
+                'general' => array(
+                    'error' => __('Something went wrong. Please try again.', 'wecoza-clients'),
+                ),
+            ),
+        );
+
+        return array_replace_recursive($base, $overrides);
     }
     
     /**
@@ -393,22 +424,10 @@ class ClientsController {
         }
         
         // Date fields
-        $dateFields = array('financial_year_end', 'bbbee_verification_date', 'class_restarts', 'class_stops');
+        $dateFields = array('financial_year_end', 'bbbee_verification_date');
         foreach ($dateFields as $field) {
             if (isset($data[$field]) && $data[$field]) {
                 $sanitized[$field] = sanitize_text_field($data[$field]);
-            }
-        }
-        
-        // Textarea fields
-        $textareaFields = array(
-            'current_classes', 'stopped_classes', 'deliveries', 'collections',
-            'cancellations', 'assessments', 'progressions'
-        );
-        
-        foreach ($textareaFields as $field) {
-            if (isset($data[$field])) {
-                $sanitized[$field] = sanitize_textarea_field($data[$field]);
             }
         }
         

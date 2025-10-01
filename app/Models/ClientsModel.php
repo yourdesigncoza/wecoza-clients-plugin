@@ -26,6 +26,66 @@ class ClientsModel {
      * @var string
      */
     protected $primaryKey = 'id';
+
+    /**
+     * Actual primary key column in database
+     *
+     * @var string
+     */
+    protected $resolvedPrimaryKey = 'id';
+
+    /**
+     * Determines if soft delete is supported
+     *
+     * @var bool
+     */
+    protected $softDeleteEnabled = true;
+
+
+    /**
+     * Determines if branch relationships are available
+     *
+     * @var bool
+     */
+    protected $branchColumnAvailable = true;
+
+    /**
+     * Candidate column mappings
+     *
+     * @var array
+     */
+    protected $columnCandidates = [
+        'id' => ['id', 'client_id'],
+        'client_name' => ['client_name'],
+        'branch_of' => ['branch_of'],
+        'company_registration_nr' => ['company_registration_nr', 'company_registration_number'],
+        'client_street_address' => ['client_street_address', 'address_line'],
+        'client_suburb' => ['client_suburb', 'suburb'],
+        'client_town' => ['client_town', 'town', 'town_name', 'town_id'],
+        'client_postal_code' => ['client_postal_code', 'postal_code'],
+        'contact_person' => ['contact_person', 'contact_person_name'],
+        'contact_person_email' => ['contact_person_email', 'contact_email'],
+        'contact_person_cellphone' => ['contact_person_cellphone', 'contact_cellphone', 'contact_mobile'],
+        'contact_person_tel' => ['contact_person_tel', 'contact_tel', 'contact_phone'],
+        'client_communication' => ['client_communication', 'communication_type'],
+        'seta' => ['seta'],
+        'client_status' => ['client_status', 'status'],
+        'financial_year_end' => ['financial_year_end'],
+        'bbbee_verification_date' => ['bbbee_verification_date'],
+        'quotes' => ['quotes'],
+        'created_by' => ['created_by'],
+        'updated_by' => ['updated_by'],
+        'created_at' => ['created_at'],
+        'updated_at' => ['updated_at'],
+        'deleted_at' => ['deleted_at'],
+    ];
+
+    /**
+     * Resolved column map
+     *
+     * @var array
+     */
+    protected $columnMap = [];
     
     /**
      * Fillable fields
@@ -50,17 +110,10 @@ class ClientsModel {
         'financial_year_end',
         'bbbee_verification_date',
         'quotes',
-        'current_classes',
-        'stopped_classes',
-        'deliveries',
-        'collections',
-        'cancellations',
-        'class_restarts',
-        'class_stops',
-        'assessments',
-        'progressions',
         'created_by',
-        'updated_by'
+        'updated_by',
+        'created_at',
+        'updated_at'
     ];
     
     /**
@@ -68,15 +121,7 @@ class ClientsModel {
      *
      * @var array
      */
-    protected $jsonFields = [
-        'current_classes',
-        'stopped_classes',
-        'deliveries',
-        'collections',
-        'cancellations',
-        'assessments',
-        'progressions'
-    ];
+    protected $jsonFields = [];
     
     /**
      * Date fields
@@ -85,10 +130,136 @@ class ClientsModel {
      */
     protected $dateFields = [
         'financial_year_end',
-        'bbbee_verification_date',
-        'class_restarts',
-        'class_stops'
+        'bbbee_verification_date'
     ];
+
+    /**
+     * Constructor
+     */
+    public function __construct() {
+        foreach ($this->columnCandidates as $field => $candidates) {
+            $this->columnMap[$field] = $this->resolveColumn($candidates);
+        }
+
+        $this->resolvedPrimaryKey = $this->columnMap['id'] ?: 'id';
+        $this->softDeleteEnabled = !empty($this->columnMap['deleted_at']);
+        $this->branchColumnAvailable = !empty($this->columnMap['branch_of']);
+
+        // Filter fillable fields to those that exist in the schema
+        $this->fillable = array_values(array_filter($this->fillable, function ($field) {
+            return !empty($this->columnMap[$field] ?? null);
+        }));
+
+        // Filter JSON fields similarly
+        $this->jsonFields = array_values(array_filter($this->jsonFields, function ($field) {
+            return !empty($this->columnMap[$field] ?? null);
+        }));
+
+        // Filter date fields similarly
+        $this->dateFields = array_values(array_filter($this->dateFields, function ($field) {
+            return !empty($this->columnMap[$field] ?? null);
+        }));
+    }
+
+    /**
+     * Resolve first available column from candidates
+     *
+     * @param array $candidates
+     * @return string|null
+     */
+    protected function resolveColumn($candidates) {
+        foreach ((array) $candidates as $candidate) {
+            if ($candidate && DatabaseService::tableHasColumn($this->table, $candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get actual column name for field
+     *
+     * @param string $field Field name
+     * @param string|null $fallback Fallback column
+     * @return string|null
+     */
+    protected function getColumn($field, $fallback = null) {
+        if (!empty($this->columnMap[$field])) {
+            return $this->columnMap[$field];
+        }
+
+        return $fallback;
+    }
+
+    /**
+     * Normalize database row to expected field names
+     *
+     * @param array $row Row data
+     * @return array
+     */
+    protected function normalizeRow($row) {
+        if (!is_array($row)) {
+            return array();
+        }
+
+        $normalized = $row;
+
+        foreach ($this->columnMap as $field => $column) {
+            if ($column && array_key_exists($column, $row)) {
+                $normalized[$field] = $row[$column];
+            }
+        }
+
+        if (!isset($normalized['id']) && isset($row[$this->resolvedPrimaryKey])) {
+            $normalized['id'] = $row[$this->resolvedPrimaryKey];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Prepare data for persistence by filtering and mapping columns
+     *
+     * @param array $data Raw data
+     * @return array
+     */
+    protected function prepareDataForSave($data) {
+        $prepared = array();
+
+        foreach ($this->fillable as $field) {
+            if (!array_key_exists($field, $data)) {
+                continue;
+            }
+
+            $column = $this->getColumn($field);
+            if (!$column) {
+                continue;
+            }
+
+            $value = $data[$field];
+
+            if (in_array($field, $this->dateFields, true) && $value === '') {
+                $value = null;
+            }
+
+            if ($field === 'branch_of' && $value === '') {
+                $value = null;
+            }
+
+            if (in_array($field, $this->jsonFields, true)) {
+                if (is_array($value)) {
+                    $value = json_encode($value);
+                } elseif ($value === '' || $value === null) {
+                    $value = '[]';
+                }
+            }
+
+            $prepared[$column] = $value;
+        }
+
+        return $prepared;
+    }
     
     /**
      * Get all clients
@@ -97,52 +268,83 @@ class ClientsModel {
      * @return array
      */
     public function getAll($params = array()) {
-        $sql = "SELECT * FROM {$this->table} WHERE deleted_at IS NULL";
+        $primaryKey = $this->resolvedPrimaryKey;
+        $alias = 'c';
+        $sql = "SELECT {$alias}.*, {$alias}.{$primaryKey} AS id FROM {$this->table} {$alias}";
         $bindings = array();
+        $whereClauses = array();
+        if ($this->softDeleteEnabled) {
+            $deletedColumn = $this->getColumn('deleted_at');
+            if ($deletedColumn) {
+                $whereClauses[] = "{$alias}.{$deletedColumn} IS NULL";
+            }
+        }
         
         // Add search filter
         if (!empty($params['search'])) {
             $search = '%' . $params['search'] . '%';
-            $sql .= " AND (
-                client_name ILIKE :search 
-                OR company_registration_nr ILIKE :search2
-                OR contact_person ILIKE :search3
-                OR contact_person_email ILIKE :search4
-                OR client_town ILIKE :search5
-            )";
-            $bindings[':search'] = $search;
-            $bindings[':search2'] = $search;
-            $bindings[':search3'] = $search;
-            $bindings[':search4'] = $search;
-            $bindings[':search5'] = $search;
+            $searchClauses = array();
+            $searchIndex = 0;
+
+            foreach (['client_name', 'company_registration_nr', 'contact_person', 'contact_person_email', 'client_town'] as $field) {
+                $column = $this->getColumn($field);
+                if ($column) {
+                    $placeholder = ':search' . $searchIndex++;
+                    $searchClauses[] = "CAST({$alias}.{$column} AS TEXT) ILIKE {$placeholder}";
+                    $bindings[$placeholder] = $search;
+                }
+            }
+
+            if (!empty($searchClauses)) {
+                $whereClauses[] = '(' . implode(' OR ', $searchClauses) . ')';
+            }
         }
         
         // Add status filter
         if (!empty($params['status'])) {
-            $sql .= " AND client_status = :status";
-            $bindings[':status'] = $params['status'];
+            $statusColumn = $this->getColumn('client_status');
+            if ($statusColumn) {
+                $whereClauses[] = "{$alias}.{$statusColumn} = :status";
+                $bindings[':status'] = $params['status'];
+            }
         }
         
         // Add SETA filter
         if (!empty($params['seta'])) {
-            $sql .= " AND seta = :seta";
-            $bindings[':seta'] = $params['seta'];
+            $setaColumn = $this->getColumn('seta');
+            if ($setaColumn) {
+                $whereClauses[] = "{$alias}.{$setaColumn} = :seta";
+                $bindings[':seta'] = $params['seta'];
+            }
         }
         
         // Add branch filter
-        if (isset($params['branch_of'])) {
+        $branchColumn = $this->getColumn('branch_of');
+        if ($branchColumn && array_key_exists('branch_of', $params)) {
             if ($params['branch_of'] === null) {
-                $sql .= " AND branch_of IS NULL";
+                $whereClauses[] = "{$alias}.{$branchColumn} IS NULL";
             } else {
-                $sql .= " AND branch_of = :branch_of";
+                $whereClauses[] = "{$alias}.{$branchColumn} = :branch_of";
                 $bindings[':branch_of'] = $params['branch_of'];
             }
+        }
+
+        if (!empty($whereClauses)) {
+            $sql .= ' WHERE ' . implode(' AND ', $whereClauses);
         }
         
         // Add sorting
         $orderBy = !empty($params['order_by']) ? $params['order_by'] : 'client_name';
+        $orderBy = preg_replace('/[^a-zA-Z0-9_]/', '', $orderBy) ?: 'client_name';
         $orderDir = !empty($params['order_dir']) && strtoupper($params['order_dir']) === 'DESC' ? 'DESC' : 'ASC';
-        $sql .= " ORDER BY {$orderBy} {$orderDir}";
+        $orderColumn = $this->getColumn($orderBy);
+        if (!$orderColumn && DatabaseService::tableHasColumn($this->table, $orderBy)) {
+            $orderColumn = $orderBy;
+        }
+        if (!$orderColumn) {
+            $orderColumn = $this->getColumn('client_name', $primaryKey);
+        }
+        $sql .= " ORDER BY {$alias}.{$orderColumn} {$orderDir}";
         
         // Add pagination
         if (!empty($params['limit'])) {
@@ -160,6 +362,7 @@ class ClientsModel {
         // Decode JSON fields
         if ($results) {
             foreach ($results as &$row) {
+                $row = $this->normalizeRow($row);
                 $this->decodeJsonFields($row);
             }
         }
@@ -174,13 +377,20 @@ class ClientsModel {
      * @return array|false
      */
     public function getById($id) {
-        $sql = "SELECT * FROM {$this->table} WHERE id = :id AND deleted_at IS NULL";
+        $primaryKey = $this->resolvedPrimaryKey;
+        $alias = 'c';
+        $sql = "SELECT {$alias}.*, {$alias}.{$primaryKey} AS id FROM {$this->table} {$alias} WHERE {$alias}.{$primaryKey} = :id";
+        $deletedColumn = $this->getColumn('deleted_at');
+        if ($this->softDeleteEnabled && $deletedColumn) {
+            $sql .= " AND {$alias}.{$deletedColumn} IS NULL";
+        }
+
         $result = DatabaseService::getRow($sql, [':id' => $id]);
         
         if ($result) {
+            $result = $this->normalizeRow($result);
             $this->decodeJsonFields($result);
         }
-        
         return $result;
     }
     
@@ -191,10 +401,23 @@ class ClientsModel {
      * @return array|false
      */
     public function getByRegistrationNumber($regNr) {
-        $sql = "SELECT * FROM {$this->table} WHERE company_registration_nr = :reg_nr AND deleted_at IS NULL";
+        $primaryKey = $this->resolvedPrimaryKey;
+        $alias = 'c';
+        $registrationColumn = $this->getColumn('company_registration_nr');
+        if (!$registrationColumn) {
+            return false;
+        }
+
+        $sql = "SELECT {$alias}.*, {$alias}.{$primaryKey} AS id FROM {$this->table} {$alias} WHERE {$alias}.{$registrationColumn} = :reg_nr";
+        $deletedColumn = $this->getColumn('deleted_at');
+        if ($this->softDeleteEnabled && $deletedColumn) {
+            $sql .= " AND {$alias}.{$deletedColumn} IS NULL";
+        }
+
         $result = DatabaseService::getRow($sql, [':reg_nr' => $regNr]);
         
         if ($result) {
+            $result = $this->normalizeRow($result);
             $this->decodeJsonFields($result);
         }
         
@@ -208,12 +431,6 @@ class ClientsModel {
      * @return int|false Client ID or false on failure
      */
     public function create($data) {
-        // Filter fillable fields
-        $data = $this->filterFillable($data);
-        
-        // Encode JSON fields
-        $this->encodeJsonFields($data);
-        
         // Add timestamps
         $data['created_at'] = current_time('mysql');
         $data['updated_at'] = current_time('mysql');
@@ -222,8 +439,14 @@ class ClientsModel {
         if (!isset($data['created_by'])) {
             $data['created_by'] = get_current_user_id();
         }
+
+        $prepared = $this->prepareDataForSave($data);
+
+        if (empty($prepared)) {
+            return false;
+        }
         
-        return DatabaseService::insert($this->table, $data);
+        return DatabaseService::insert($this->table, $prepared);
     }
     
     /**
@@ -234,12 +457,6 @@ class ClientsModel {
      * @return bool
      */
     public function update($id, $data) {
-        // Filter fillable fields
-        $data = $this->filterFillable($data);
-        
-        // Encode JSON fields
-        $this->encodeJsonFields($data);
-        
         // Update timestamp
         $data['updated_at'] = current_time('mysql');
         
@@ -247,11 +464,22 @@ class ClientsModel {
         if (!isset($data['updated_by'])) {
             $data['updated_by'] = get_current_user_id();
         }
-        
+
+        $prepared = $this->prepareDataForSave($data);
+
+        if (empty($prepared)) {
+            return true;
+        }
+
+        $whereClause = $this->resolvedPrimaryKey . ' = :id';
+        if ($this->softDeleteEnabled) {
+            $whereClause .= ' AND deleted_at IS NULL';
+        }
+
         $result = DatabaseService::update(
             $this->table,
-            $data,
-            'id = :id AND deleted_at IS NULL',
+            $prepared,
+            $whereClause,
             [':id' => $id]
         );
         
@@ -270,13 +498,51 @@ class ClientsModel {
             'updated_by' => get_current_user_id()
         ];
         
-        $result = DatabaseService::update(
+        if ($this->softDeleteEnabled) {
+            $updateData = array();
+
+            $deletedAtColumn = $this->getColumn('deleted_at');
+            if ($deletedAtColumn) {
+                $updateData[$deletedAtColumn] = current_time('mysql');
+            }
+
+            $updatedByColumn = $this->getColumn('updated_by');
+            if ($updatedByColumn) {
+                $updateData[$updatedByColumn] = get_current_user_id();
+            }
+
+            $updatedAtColumn = $this->getColumn('updated_at');
+            if ($updatedAtColumn) {
+                $updateData[$updatedAtColumn] = current_time('mysql');
+            }
+
+            if (empty($updateData)) {
+                // No columns to update, fall back to hard delete
+                $result = DatabaseService::delete(
+                    $this->table,
+                    $this->resolvedPrimaryKey . ' = :id',
+                    [':id' => $id]
+                );
+
+                return $result !== false;
+            }
+
+            $result = DatabaseService::update(
+                $this->table,
+                $updateData,
+                $this->resolvedPrimaryKey . ' = :id',
+                [':id' => $id]
+            );
+
+            return $result !== false;
+        }
+
+        $result = DatabaseService::delete(
             $this->table,
-            $data,
-            'id = :id AND deleted_at IS NULL',
+            $this->resolvedPrimaryKey . ' = :id',
             [':id' => $id]
         );
-        
+
         return $result !== false;
     }
     
@@ -287,36 +553,67 @@ class ClientsModel {
      * @return int
      */
     public function count($params = array()) {
-        $sql = "SELECT COUNT(*) FROM {$this->table} WHERE deleted_at IS NULL";
+        $alias = 'c';
+        $sql = "SELECT COUNT(*) FROM {$this->table} {$alias}";
         $bindings = array();
+        $whereClauses = array();
+        if ($this->softDeleteEnabled) {
+            $deletedColumn = $this->getColumn('deleted_at');
+            if ($deletedColumn) {
+                $whereClauses[] = "{$alias}.{$deletedColumn} IS NULL";
+            }
+        }
         
         // Add search filter
         if (!empty($params['search'])) {
             $search = '%' . $params['search'] . '%';
-            $sql .= " AND (
-                client_name ILIKE :search 
-                OR company_registration_nr ILIKE :search2
-                OR contact_person ILIKE :search3
-                OR contact_person_email ILIKE :search4
-                OR client_town ILIKE :search5
-            )";
-            $bindings[':search'] = $search;
-            $bindings[':search2'] = $search;
-            $bindings[':search3'] = $search;
-            $bindings[':search4'] = $search;
-            $bindings[':search5'] = $search;
+            $searchClauses = array();
+            $searchIndex = 0;
+
+            foreach (['client_name', 'company_registration_nr', 'contact_person', 'contact_person_email', 'client_town'] as $field) {
+                $column = $this->getColumn($field);
+                if ($column) {
+                    $placeholder = ':count_search' . $searchIndex++;
+                    $searchClauses[] = "CAST({$alias}.{$column} AS TEXT) ILIKE {$placeholder}";
+                    $bindings[$placeholder] = $search;
+                }
+            }
+
+            if (!empty($searchClauses)) {
+                $whereClauses[] = '(' . implode(' OR ', $searchClauses) . ')';
+            }
         }
         
         // Add status filter
         if (!empty($params['status'])) {
-            $sql .= " AND client_status = :status";
-            $bindings[':status'] = $params['status'];
+            $statusColumn = $this->getColumn('client_status');
+            if ($statusColumn) {
+                $whereClauses[] = "{$alias}.{$statusColumn} = :status";
+                $bindings[':status'] = $params['status'];
+            }
         }
         
         // Add SETA filter
         if (!empty($params['seta'])) {
-            $sql .= " AND seta = :seta";
-            $bindings[':seta'] = $params['seta'];
+            $setaColumn = $this->getColumn('seta');
+            if ($setaColumn) {
+                $whereClauses[] = "{$alias}.{$setaColumn} = :seta";
+                $bindings[':seta'] = $params['seta'];
+            }
+        }
+
+        $branchColumn = $this->getColumn('branch_of');
+        if ($branchColumn && array_key_exists('branch_of', $params)) {
+            if ($params['branch_of'] === null) {
+                $whereClauses[] = "{$alias}.{$branchColumn} IS NULL";
+            } else {
+                $whereClauses[] = "{$alias}.{$branchColumn} = :count_branch_of";
+                $bindings[':count_branch_of'] = $params['branch_of'];
+            }
+        }
+
+        if (!empty($whereClauses)) {
+            $sql .= ' WHERE ' . implode(' AND ', $whereClauses);
         }
         
         $count = DatabaseService::getValue($sql, $bindings);
@@ -329,9 +626,28 @@ class ClientsModel {
      * @return array
      */
     public function getStatistics() {
-        $sql = "SELECT * FROM client_statistics";
+        $alias = 'c';
+        $statusColumn = $this->getColumn('client_status');
+        $branchColumn = $this->getColumn('branch_of');
+        $deletedColumn = $this->getColumn('deleted_at');
+
+        $selectParts = array(
+            'COUNT(*) AS total_clients',
+            $statusColumn ? "SUM(CASE WHEN {$alias}.{$statusColumn} = 'Active Client' THEN 1 ELSE 0 END) AS active_clients" : '0 AS active_clients',
+            $statusColumn ? "SUM(CASE WHEN {$alias}.{$statusColumn} = 'Lead' THEN 1 ELSE 0 END) AS leads" : '0 AS leads',
+            $statusColumn ? "SUM(CASE WHEN {$alias}.{$statusColumn} = 'Cold Call' THEN 1 ELSE 0 END) AS cold_calls" : '0 AS cold_calls',
+            $statusColumn ? "SUM(CASE WHEN {$alias}.{$statusColumn} = 'Lost Client' THEN 1 ELSE 0 END) AS lost_clients" : '0 AS lost_clients',
+            $branchColumn ? "SUM(CASE WHEN {$alias}.{$branchColumn} IS NOT NULL THEN 1 ELSE 0 END) AS branch_clients" : '0 AS branch_clients',
+        );
+
+        $sql = 'SELECT ' . implode(', ', $selectParts) . " FROM {$this->table} {$alias}";
+
+        if ($this->softDeleteEnabled && $deletedColumn) {
+            $sql .= " WHERE {$alias}.{$deletedColumn} IS NULL";
+        }
+
         $result = DatabaseService::getRow($sql);
-        
+
         return $result ?: array(
             'total_clients' => 0,
             'active_clients' => 0,
@@ -349,11 +665,27 @@ class ClientsModel {
      * @return array
      */
     public function getBranchClients($parentId) {
-        $sql = "SELECT * FROM {$this->table} WHERE branch_of = :parent_id AND deleted_at IS NULL ORDER BY client_name";
+        if (!$this->branchColumnAvailable) {
+            return array();
+        }
+
+        $primaryKey = $this->resolvedPrimaryKey;
+        $alias = 'c';
+        $branchColumn = $this->getColumn('branch_of');
+        $deletedColumn = $this->getColumn('deleted_at');
+        $orderColumn = $this->getColumn('client_name', $primaryKey);
+
+        $sql = "SELECT {$alias}.*, {$alias}.{$primaryKey} AS id FROM {$this->table} {$alias} WHERE {$alias}.{$branchColumn} = :parent_id";
+        if ($this->softDeleteEnabled && $deletedColumn) {
+            $sql .= " AND {$alias}.{$deletedColumn} IS NULL";
+        }
+        $sql .= " ORDER BY {$alias}.{$orderColumn}";
+
         $results = DatabaseService::getAll($sql, [':parent_id' => $parentId]);
         
         if ($results) {
             foreach ($results as &$row) {
+                $row = $this->normalizeRow($row);
                 $this->decodeJsonFields($row);
             }
         }
@@ -367,11 +699,48 @@ class ClientsModel {
      * @return array
      */
     public function getForDropdown() {
-        $sql = "SELECT id, client_name, company_registration_nr FROM {$this->table} 
-                WHERE deleted_at IS NULL AND branch_of IS NULL 
-                ORDER BY client_name";
+        $primaryKey = $this->resolvedPrimaryKey;
+        $alias = 'c';
+        $nameColumn = $this->getColumn('client_name', $primaryKey);
+        $registrationColumn = $this->getColumn('company_registration_nr');
+        $branchColumn = $this->getColumn('branch_of');
+        $deletedColumn = $this->getColumn('deleted_at');
+
+        $selectParts = array(
+            "{$alias}.{$primaryKey} AS id",
+            "{$alias}.{$nameColumn} AS client_name",
+        );
+
+        if ($registrationColumn) {
+            $selectParts[] = "{$alias}.{$registrationColumn} AS company_registration_nr";
+        }
+
+        $sql = 'SELECT ' . implode(', ', $selectParts) . " FROM {$this->table} {$alias}";
+        $conditions = array();
+
+        if ($this->softDeleteEnabled && $deletedColumn) {
+            $conditions[] = "{$alias}.{$deletedColumn} IS NULL";
+        }
+
+        if ($this->branchColumnAvailable && $branchColumn) {
+            $conditions[] = "{$alias}.{$branchColumn} IS NULL";
+        }
+
+        if (!empty($conditions)) {
+            $sql .= ' WHERE ' . implode(' AND ', $conditions);
+        }
+
+        $sql .= " ORDER BY {$alias}.{$nameColumn}";
         
-        return DatabaseService::getAll($sql) ?: array();
+        $results = DatabaseService::getAll($sql) ?: array();
+
+        if ($results) {
+            foreach ($results as &$row) {
+                $row = $this->normalizeRow($row);
+            }
+        }
+
+        return $results;
     }
     
     /**

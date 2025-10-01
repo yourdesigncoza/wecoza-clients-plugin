@@ -34,6 +34,16 @@ class DatabaseService {
      * @var string
      */
     private static $lastError = '';
+
+    /**
+     * Schema inspection cache
+     *
+     * @var array
+     */
+    private static $schemaCache = array(
+        'columns' => array(),
+        'relations' => array(),
+    );
     
     /**
      * Get database connection
@@ -189,11 +199,23 @@ class DatabaseService {
                 return ':' . $field;
             }, $fields);
             
+            $returningColumn = 'id';
+            if (!self::tableHasColumn($table, 'id')) {
+                if (self::tableHasColumn($table, 'client_id')) {
+                    $returningColumn = 'client_id';
+                } else {
+                    $returningColumn = null;
+                }
+            }
+
+            $returningClause = $returningColumn ? ' RETURNING ' . $returningColumn : '';
+
             $sql = sprintf(
-                'INSERT INTO %s (%s) VALUES (%s) RETURNING id',
+                'INSERT INTO %s (%s) VALUES (%s)%s',
                 $table,
                 implode(', ', $fields),
-                implode(', ', $placeholders)
+                implode(', ', $placeholders),
+                $returningClause
             );
             
             $stmt = $pdo->prepare($sql);
@@ -204,8 +226,12 @@ class DatabaseService {
             }
             
             $stmt->execute();
-            
-            return $stmt->fetchColumn();
+
+            if ($returningColumn) {
+                return $stmt->fetchColumn();
+            }
+
+            return true;
             
         } catch (PDOException $e) {
             self::$lastError = 'Insert failed: ' . $e->getMessage();
@@ -336,6 +362,97 @@ class DatabaseService {
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('WeCoza Clients Database: ' . $message);
         }
+    }
+
+    /**
+     * Check if a relation (table, view, etc.) exists
+     *
+     * @param string $relation Relation name
+     * @return bool
+     */
+    public static function relationExists($relation) {
+        if (empty($relation)) {
+            return false;
+        }
+
+        $cacheKey = strtolower($relation);
+        if (isset(self::$schemaCache['relations'][$cacheKey])) {
+            return self::$schemaCache['relations'][$cacheKey];
+        }
+
+        $pdo = self::getConnection();
+        if (!$pdo) {
+            return false;
+        }
+
+        try {
+            $stmt = $pdo->prepare('SELECT to_regclass(:relation_name)');
+            $stmt->execute(array(':relation_name' => $relation));
+            $exists = $stmt->fetchColumn() !== false;
+        } catch (PDOException $e) {
+            self::logError('Schema check failed: ' . $e->getMessage());
+            $exists = false;
+        }
+
+        self::$schemaCache['relations'][$cacheKey] = $exists;
+        return $exists;
+    }
+
+    /**
+     * Check if a table has a specific column
+     *
+     * @param string $table Table name
+     * @param string $column Column name
+     * @return bool
+     */
+    public static function tableHasColumn($table, $column) {
+        if (empty($table) || empty($column)) {
+            return false;
+        }
+
+        $cacheKey = strtolower($table . '.' . $column);
+        if (isset(self::$schemaCache['columns'][$cacheKey])) {
+            return self::$schemaCache['columns'][$cacheKey];
+        }
+
+        $pdo = self::getConnection();
+        if (!$pdo) {
+            return false;
+        }
+
+        $schema = null;
+        $tableName = $table;
+
+        if (strpos($table, '.') !== false) {
+            list($schema, $tableName) = explode('.', $table, 2);
+        }
+
+        $sql = 'SELECT 1 FROM information_schema.columns WHERE table_name = :table AND column_name = :column';
+        $params = array(
+            ':table' => $tableName,
+            ':column' => $column,
+        );
+
+        if ($schema) {
+            $sql .= ' AND table_schema = :schema';
+            $params[':schema'] = $schema;
+        } else {
+            $sql .= ' AND table_schema = ANY (current_schemas(false))';
+        }
+
+        $sql .= ' LIMIT 1';
+
+        try {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $exists = $stmt->fetchColumn() !== false;
+        } catch (PDOException $e) {
+            self::logError('Schema check failed: ' . $e->getMessage());
+            $exists = false;
+        }
+
+        self::$schemaCache['columns'][$cacheKey] = $exists;
+        return $exists;
     }
     
     /**
