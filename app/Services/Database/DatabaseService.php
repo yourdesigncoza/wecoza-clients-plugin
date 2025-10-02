@@ -131,8 +131,10 @@ class DatabaseService {
                 return false;
             }
             
+            $startTime = microtime(true);
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
+            self::logQueryTiming($sql, $params, $startTime);
             
             return $stmt;
             
@@ -240,6 +242,34 @@ class DatabaseService {
         }
     }
     
+    /**
+     * Log slow queries when debug is enabled
+     *
+     * @param string $sql
+     * @param array $params
+     * @param float $startTime
+     * @return void
+     */
+    protected static function logQueryTiming($sql, $params, $startTime) {
+        if (!(defined('WP_DEBUG') && WP_DEBUG)) {
+            return;
+        }
+
+        $elapsed = microtime(true) - $startTime;
+        if ($elapsed < 0.5) {
+            return;
+        }
+
+        $message = sprintf(
+            'WeCoza Clients Slow Query (%.2fs): %s | Params: %s',
+            $elapsed,
+            preg_replace('/\s+/', ' ', trim($sql)),
+            json_encode($params)
+        );
+
+        error_log($message);
+    }
+
     /**
      * Update data
      *

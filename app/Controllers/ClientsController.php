@@ -91,7 +91,11 @@ class ClientsController {
             wp_localize_script(
                 'wecoza-client-capture',
                 'wecoza_clients',
-                $this->getLocalizationPayload($nonce)
+                $this->getLocalizationPayload($nonce, array(
+                    'locations' => array(
+                        'hierarchy' => $this->model->getLocationHierarchy(),
+                    ),
+                ))
             );
         }
         
@@ -155,6 +159,9 @@ class ClientsController {
                     'error' => __('Something went wrong. Please try again.', 'wecoza-clients'),
                 ),
             ),
+            'locations' => array(
+                'hierarchy' => array(),
+            ),
         );
 
         return array_replace_recursive($base, $overrides);
@@ -208,6 +215,25 @@ class ClientsController {
         $config = \WeCozaClients\config('app');
         $seta_options = $config['seta_options'];
         $status_options = $config['client_status_options'];
+
+        $selectedProvince = $client['client_province'] ?? ($client['client_location']['province'] ?? '');
+        $selectedTown = $client['client_town'] ?? ($client['client_location']['town'] ?? '');
+        $selectedSuburb = $client['client_suburb'] ?? ($client['client_location']['suburb'] ?? '');
+        $selectedLocationId = !empty($client['client_town_id']) ? (int) $client['client_town_id'] : null;
+        $selectedPostal = $client['client_postal_code'] ?? ($client['client_location']['postal_code'] ?? '');
+
+        $hierarchy = $this->model->getLocationHierarchy();
+
+        $locationData = array(
+            'hierarchy' => $hierarchy,
+            'selected' => array(
+                'province' => $selectedProvince,
+                'town' => $selectedTown,
+                'suburb' => $selectedSuburb,
+                'locationId' => $selectedLocationId,
+                'postalCode' => $selectedPostal,
+            ),
+        );
         
         // Load view
         return \WeCozaClients\view('components/client-capture-form', array(
@@ -217,6 +243,7 @@ class ClientsController {
             'branches' => $branches,
             'seta_options' => $seta_options,
             'status_options' => $status_options,
+            'location_data' => $locationData,
         ));
     }
     
@@ -402,9 +429,9 @@ class ClientsController {
         // Text fields
         $textFields = array(
             'client_name', 'company_registration_nr', 'client_street_address',
-            'client_suburb', 'client_town', 'client_postal_code', 'contact_person',
-            'contact_person_cellphone', 'contact_person_tel', 'client_communication',
-            'seta', 'client_status'
+            'client_suburb', 'client_postal_code', 'client_province', 'client_town_name',
+            'contact_person', 'contact_person_cellphone', 'contact_person_tel',
+            'client_communication', 'seta', 'client_status'
         );
         
         foreach ($textFields as $field) {
@@ -422,6 +449,26 @@ class ClientsController {
         if (isset($data['branch_of']) && $data['branch_of']) {
             $sanitized['branch_of'] = intval($data['branch_of']);
         }
+
+        if (isset($data['client_town_id'])) {
+            $townId = intval($data['client_town_id']);
+            if ($townId > 0) {
+                $location = $this->model->getLocationById($townId);
+                if ($location) {
+                    $sanitized['client_town_id'] = $townId;
+                    $sanitized['client_suburb'] = $location['suburb'] ?? ($sanitized['client_suburb'] ?? '');
+                    $sanitized['client_postal_code'] = $location['postal_code'] ?? ($sanitized['client_postal_code'] ?? '');
+                    $sanitized['client_province'] = $location['province'] ?? ($sanitized['client_province'] ?? '');
+                    $sanitized['client_town'] = $location['town'] ?? '';
+                }
+            }
+        }
+
+        if (!empty($sanitized['client_town_name']) && empty($sanitized['client_town'])) {
+            $sanitized['client_town'] = $sanitized['client_town_name'];
+        }
+
+        unset($sanitized['client_town_name']);
         
         // Date fields
         $dateFields = array('financial_year_end', 'bbbee_verification_date');
@@ -573,7 +620,7 @@ class ClientsController {
         
         wp_die(json_encode(array('success' => true, 'clients' => $clients)));
     }
-    
+
     /**
      * AJAX: Get branch clients
      */

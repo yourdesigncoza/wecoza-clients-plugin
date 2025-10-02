@@ -15,6 +15,67 @@ $success = $success ?? false;
 $branches = $branches ?? array();
 $seta_options = $seta_options ?? array();
 $status_options = $status_options ?? array();
+$location_data = $location_data ?? array();
+$location_selected = $location_data['selected'] ?? array();
+$location_hierarchy = $location_data['hierarchy'] ?? array();
+
+$selected_province = $location_selected['province'] ?? ($client['client_province'] ?? '');
+$selected_town = $location_selected['town'] ?? ($client['client_town'] ?? '');
+$selected_location_id = $location_selected['locationId'] ?? ($client['client_town_id'] ?? '');
+$selected_suburb = $location_selected['suburb'] ?? ($client['client_suburb'] ?? '');
+$selected_postal_code = $location_selected['postalCode'] ?? ($client['client_postal_code'] ?? '');
+
+$province_options = array();
+$town_options = array();
+$suburb_options = array();
+
+foreach ($location_hierarchy as $provinceData) {
+    $provinceName = $provinceData['name'] ?? '';
+    if ($provinceName === '') {
+        continue;
+    }
+
+    $province_options[$provinceName] = $provinceName;
+
+    if ($provinceName !== $selected_province || empty($provinceData['towns'])) {
+        continue;
+    }
+
+    foreach ($provinceData['towns'] as $townData) {
+        $townName = $townData['name'] ?? '';
+        if ($townName === '') {
+            continue;
+        }
+
+        $town_options[$townName] = $townName;
+
+        if ($townName !== $selected_town || empty($townData['suburbs'])) {
+            continue;
+        }
+
+        foreach ($townData['suburbs'] as $suburbData) {
+            $locationId = isset($suburbData['id']) ? (int) $suburbData['id'] : 0;
+            if ($locationId <= 0) {
+                continue;
+            }
+
+            $label = $suburbData['name'] ?? '';
+            $suburb_options[$locationId] = array(
+                'label' => $label,
+                'data' => array(
+                    'postal_code' => $suburbData['postal_code'] ?? '',
+                    'suburb' => $label,
+                    'town' => $townName,
+                    'province' => $provinceName,
+                ),
+            );
+        }
+    }
+}
+
+$has_province = $selected_province !== '';
+$has_town = $selected_town !== '';
+$has_location = !empty($selected_location_id);
 
 $is_edit = !empty($client['id']);
 ?>
@@ -93,42 +154,61 @@ $is_edit = !empty($client['id']);
         <!-- Address Information -->
         <div class="row">
             <?php
-            echo ViewHelpers::renderField('text', 'client_street_address', 'Client Street Address', 
-                $client['client_street_address'] ?? '', 
+            echo ViewHelpers::renderField('select', 'client_province', 'Province', 
+                $selected_province, 
                 array(
                     'required' => true,
-                    'col_class' => 'col-md-6',
-                    'error' => $errors['client_street_address'] ?? ''
+                    'col_class' => 'col-md-4 js-province-field',
+                    'class' => 'js-province-select',
+                    'options' => $province_options,
+                    'error' => $errors['client_province'] ?? ''
                 )
             );
-            
-            echo ViewHelpers::renderField('text', 'client_suburb', 'Client Suburb', 
-                $client['client_suburb'] ?? '', 
+
+            echo ViewHelpers::renderField('select', 'client_town', 'Town', 
+                $selected_town, 
                 array(
                     'required' => true,
-                    'col_class' => 'col-md-6',
-                    'error' => $errors['client_suburb'] ?? ''
+                    'col_class' => 'col-md-4 js-town-field' . ($has_province ? '' : ' d-none'),
+                    'class' => 'js-town-select',
+                    'options' => $town_options,
+                    'error' => ''
+                )
+            );
+
+            echo ViewHelpers::renderField('select', 'client_town_id', 'Suburb', 
+                $selected_location_id, 
+                array(
+                    'required' => true,
+                    'col_class' => 'col-md-4 js-suburb-field' . ($has_town ? '' : ' d-none'),
+                    'class' => 'js-suburb-select',
+                    'options' => $suburb_options,
+                    'error' => $errors['client_town_id'] ?? ($errors['client_suburb'] ?? '')
                 )
             );
             ?>
         </div>
-        
+
+        <input type="hidden" name="client_suburb" value="<?php echo esc_attr($selected_suburb); ?>" class="js-suburb-hidden">
+        <input type="hidden" name="client_town_name" value="<?php echo esc_attr($selected_town); ?>" class="js-town-hidden">
+
         <div class="row mt-3">
             <?php
-            echo ViewHelpers::renderField('text', 'client_town', 'Client Town', 
-                $client['client_town'] ?? '', 
+            echo ViewHelpers::renderField('text', 'client_street_address', 'Client Street Address', 
+                $client['client_street_address'] ?? '', 
                 array(
                     'required' => true,
-                    'col_class' => 'col-md-6',
-                    'error' => $errors['client_town'] ?? ''
+                    'col_class' => 'col-md-6 js-address-field' . ($has_location ? '' : ' d-none'),
+                    'error' => $errors['client_street_address'] ?? ''
                 )
             );
-            
+
             echo ViewHelpers::renderField('text', 'client_postal_code', 'Client Postal Code', 
-                $client['client_postal_code'] ?? '', 
+                $selected_postal_code, 
                 array(
                     'required' => true,
-                    'col_class' => 'col-md-6',
+                    'readonly' => true,
+                    'col_class' => 'col-md-6 js-postal-field' . ($has_location ? '' : ' d-none'),
                     'error' => $errors['client_postal_code'] ?? ''
                 )
             );

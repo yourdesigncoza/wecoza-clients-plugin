@@ -61,7 +61,9 @@ class ClientsModel {
         'company_registration_nr' => ['company_registration_nr', 'company_registration_number'],
         'client_street_address' => ['client_street_address', 'address_line'],
         'client_suburb' => ['client_suburb', 'suburb'],
-        'client_town' => ['client_town', 'town', 'town_name', 'town_id'],
+        'client_town' => ['client_town', 'town', 'town_name'],
+        'client_town_id' => ['client_town_id', 'town_id'],
+        'client_province' => ['client_province', 'province'],
         'client_postal_code' => ['client_postal_code', 'postal_code'],
         'contact_person' => ['contact_person', 'contact_person_name'],
         'contact_person_email' => ['contact_person_email', 'contact_email'],
@@ -100,6 +102,34 @@ class ClientsModel {
      * @var ClientCommunicationsModel
      */
     protected $communicationsModel;
+
+    /**
+     * Locations table name
+     *
+     * @var string
+     */
+    protected $locationsTable = 'public.locations';
+
+    /**
+     * Flag indicating if locations table is available
+     *
+     * @var bool|null
+     */
+    protected $locationsEnabled = null;
+
+    /**
+     * Cached location rows keyed by ID
+     *
+     * @var array
+     */
+    protected $locationsCache = array();
+
+    /**
+     * Cached hierarchy data
+     *
+     * @var array|null
+     */
+    protected static $locationHierarchy = null;
     
     /**
      * Fillable fields
@@ -112,7 +142,8 @@ class ClientsModel {
         'company_registration_nr',
         'client_street_address',
         'client_suburb',
-        'client_town',
+        'client_province',
+        'client_town_id',
         'client_postal_code',
         'contact_person',
         'contact_person_email',
@@ -256,6 +287,18 @@ class ClientsModel {
 
             $value = $data[$field];
 
+            if ($field === 'client_town_id') {
+                $value = ($value === '' || $value === null) ? null : (int) $value;
+            }
+
+            if ($field === 'client_province' && $value === '') {
+                $value = null;
+            }
+
+            if (in_array($field, array('client_suburb', 'client_postal_code'), true) && $value === '') {
+                $value = null;
+            }
+
             if (in_array($field, $this->dateFields, true) && $value === '') {
                 $value = null;
             }
@@ -395,13 +438,21 @@ class ClientsModel {
             $searchClauses = array();
             $searchIndex = 0;
 
-            foreach (['client_name', 'company_registration_nr', 'contact_person', 'contact_person_email', 'client_town'] as $field) {
+            $searchFields = array('client_name', 'company_registration_nr', 'contact_person', 'contact_person_email', 'client_suburb', 'client_province');
+            foreach ($searchFields as $field) {
                 $column = $this->getColumn($field);
                 if ($column) {
                     $placeholder = ':search' . $searchIndex++;
                     $searchClauses[] = "CAST({$alias}.{$column} AS TEXT) ILIKE {$placeholder}";
                     $bindings[$placeholder] = $search;
                 }
+            }
+
+            $locationColumn = $this->getColumn('client_town_id');
+            if ($locationColumn && $this->locationsAvailable()) {
+                $placeholder = ':search' . $searchIndex++;
+                $searchClauses[] = "EXISTS (SELECT 1 FROM {$this->locationsTable} l WHERE l.location_id = {$alias}.{$locationColumn} AND (l.town ILIKE {$placeholder} OR l.suburb ILIKE {$placeholder} OR l.province ILIKE {$placeholder}))";
+                $bindings[$placeholder] = $search;
             }
 
             if (!empty($searchClauses)) {
@@ -477,6 +528,7 @@ class ClientsModel {
         }
         
         if ($results) {
+            $this->hydrateLocationData($results);
             $this->hydrateRelatedData($results);
         }
         
@@ -503,6 +555,7 @@ class ClientsModel {
         if ($result) {
             $result = $this->normalizeRow($result);
             $this->decodeJsonFields($result);
+            $this->hydrateLocationData($result);
             $this->hydrateRelatedData($result);
         }
         return $result;
@@ -726,13 +779,21 @@ class ClientsModel {
             $searchClauses = array();
             $searchIndex = 0;
 
-            foreach (['client_name', 'company_registration_nr', 'contact_person', 'contact_person_email', 'client_town'] as $field) {
+            $searchFields = array('client_name', 'company_registration_nr', 'contact_person', 'contact_person_email', 'client_suburb', 'client_province');
+            foreach ($searchFields as $field) {
                 $column = $this->getColumn($field);
                 if ($column) {
                     $placeholder = ':count_search' . $searchIndex++;
                     $searchClauses[] = "CAST({$alias}.{$column} AS TEXT) ILIKE {$placeholder}";
                     $bindings[$placeholder] = $search;
                 }
+            }
+
+            $locationColumn = $this->getColumn('client_town_id');
+            if ($locationColumn && $this->locationsAvailable()) {
+                $placeholder = ':count_search' . $searchIndex++;
+                $searchClauses[] = "EXISTS (SELECT 1 FROM {$this->locationsTable} l WHERE l.location_id = {$alias}.{$locationColumn} AND (l.town ILIKE {$placeholder} OR l.suburb ILIKE {$placeholder} OR l.province ILIKE {$placeholder}))";
+                $bindings[$placeholder] = $search;
             }
 
             if (!empty($searchClauses)) {
@@ -847,6 +908,7 @@ class ClientsModel {
         }
         
         if ($results) {
+            $this->hydrateLocationData($results);
             $this->hydrateRelatedData($results);
         }
         
@@ -934,6 +996,18 @@ class ClientsModel {
                 $errors[$field] = ucfirst(str_replace('_', ' ', $field)) . ' must not exceed ' . $fieldRules['max_length'] . ' characters.';
             }
             
+            // Check integer
+            if (!empty($fieldRules['integer'])) {
+                if (filter_var($value, FILTER_VALIDATE_INT) === false) {
+                    $errors[$field] = ucfirst(str_replace('_', ' ', $field)) . ' must be a valid number.';
+                    continue;
+                }
+
+                if (!empty($fieldRules['min']) && (int)$value < (int)$fieldRules['min']) {
+                    $errors[$field] = ucfirst(str_replace('_', ' ', $field)) . ' must be at least ' . $fieldRules['min'] . '.';
+                }
+            }
+
             // Check email format
             if (!empty($fieldRules['email']) && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
                 $errors[$field] = 'Please provide a valid email address.';
@@ -964,6 +1038,234 @@ class ClientsModel {
         return $errors;
     }
     
+    /**
+     * Determine if locations table is available
+     *
+     * @return bool
+     */
+    protected function locationsAvailable() {
+        if ($this->locationsEnabled === null) {
+            $this->locationsEnabled = DatabaseService::relationExists($this->locationsTable);
+        }
+
+        return (bool) $this->locationsEnabled;
+    }
+
+    /**
+     * Get location by ID
+     *
+     * @param int $locationId Location ID
+     * @return array|null
+     */
+    public function getLocationById($locationId) {
+        $locationId = (int) $locationId;
+        if ($locationId <= 0 || !$this->locationsAvailable()) {
+            return null;
+        }
+
+        if (array_key_exists($locationId, $this->locationsCache)) {
+            return $this->locationsCache[$locationId] ?: null;
+        }
+
+        $sql = "SELECT location_id, suburb, town, province, postal_code FROM {$this->locationsTable} WHERE location_id = :id LIMIT 1";
+        $row = DatabaseService::getRow($sql, array(':id' => $locationId));
+        $this->locationsCache[$locationId] = $row ?: null;
+
+        return $row ?: null;
+    }
+
+    /**
+     * Get full location hierarchy (province -> towns -> suburbs)
+     *
+     * @param bool $useCache Use cached data if available
+     * @return array
+     */
+    public function getLocationHierarchy($useCache = true) {
+        if (!$this->locationsAvailable()) {
+            return array();
+        }
+
+        if ($useCache && self::$locationHierarchy !== null) {
+            return self::$locationHierarchy;
+        }
+
+        $cacheKey = 'wecoza_clients_location_hierarchy';
+        $cached = $useCache ? get_transient($cacheKey) : false;
+        if ($cached && is_array($cached)) {
+            self::$locationHierarchy = $cached;
+            return $cached;
+        }
+
+        $sql = "SELECT location_id, province, town, suburb, postal_code FROM {$this->locationsTable} WHERE province IS NOT NULL AND province <> '' ORDER BY province, town, suburb";
+        $rows = DatabaseService::getAll($sql) ?: array();
+
+        $hierarchy = array();
+        foreach ($rows as $row) {
+            $province = $row['province'] ?? '';
+            $town = $row['town'] ?? '';
+            $suburb = $row['suburb'] ?? '';
+            $locationId = isset($row['location_id']) ? (int) $row['location_id'] : 0;
+
+            if ($province === '' || $town === '' || $suburb === '' || $locationId <= 0) {
+                continue;
+            }
+
+            if (!isset($hierarchy[$province])) {
+                $hierarchy[$province] = array(
+                    'name' => $province,
+                    'towns' => array(),
+                );
+            }
+
+            if (!isset($hierarchy[$province]['towns'][$town])) {
+                $hierarchy[$province]['towns'][$town] = array(
+                    'name' => $town,
+                    'suburbs' => array(),
+                );
+            }
+
+            $hierarchy[$province]['towns'][$town]['suburbs'][] = array(
+                'id' => $locationId,
+                'name' => $suburb,
+                'postal_code' => $row['postal_code'] ?? '',
+            );
+        }
+
+        $hierarchy = array_values(array_map(function ($provinceData) {
+            $provinceData['towns'] = array_values(array_map(function ($townData) {
+                $townData['suburbs'] = array_values($townData['suburbs']);
+                return $townData;
+            }, $provinceData['towns']));
+            return $provinceData;
+        }, $hierarchy));
+
+        set_transient($cacheKey, $hierarchy, HOUR_IN_SECONDS);
+        self::$locationHierarchy = $hierarchy;
+
+        return $hierarchy;
+    }
+
+    /**
+     * Fetch multiple locations by IDs
+     *
+     * @param array $ids Location IDs
+     * @return array
+     */
+    protected function getLocationsByIds($ids) {
+        if (!$this->locationsAvailable()) {
+            return array();
+        }
+
+        $ids = array_values(array_unique(array_filter(array_map('intval', (array) $ids))));
+        if (empty($ids)) {
+            return array();
+        }
+
+        $uncached = array();
+        foreach ($ids as $id) {
+            if (!array_key_exists($id, $this->locationsCache)) {
+                $uncached[] = $id;
+            }
+        }
+
+        if (!empty($uncached)) {
+            $placeholders = array();
+            $params = array();
+            foreach ($uncached as $index => $id) {
+                $placeholder = ':loc' . $index;
+                $placeholders[] = $placeholder;
+                $params[$placeholder] = $id;
+            }
+
+            $sql = "SELECT location_id, suburb, town, province, postal_code FROM {$this->locationsTable} WHERE location_id IN (" . implode(', ', $placeholders) . ')';
+            $rows = DatabaseService::getAll($sql, $params) ?: array();
+
+            $fetched = array();
+            foreach ($rows as $row) {
+                $key = isset($row['location_id']) ? (int) $row['location_id'] : 0;
+                if ($key > 0) {
+                    $this->locationsCache[$key] = $row;
+                    $fetched[] = $key;
+                }
+            }
+
+            foreach ($uncached as $id) {
+                if (!in_array($id, $fetched, true)) {
+                    $this->locationsCache[$id] = null;
+                }
+            }
+        }
+
+        $result = array();
+        foreach ($ids as $id) {
+            if (!empty($this->locationsCache[$id])) {
+                $result[$id] = $this->locationsCache[$id];
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Hydrate location data into result rows
+     *
+     * @param array $rows Rows to hydrate
+     * @return void
+     */
+    protected function hydrateLocationData(&$rows) {
+        if (empty($rows) || !$this->locationsAvailable()) {
+            return;
+        }
+
+        $single = false;
+        if (isset($rows['id'])) {
+            $rows = array($rows);
+            $single = true;
+        }
+
+        $locationIds = array();
+        foreach ($rows as $row) {
+            if (!empty($row['client_town_id'])) {
+                $locationIds[] = (int) $row['client_town_id'];
+            } elseif (!empty($row['client_town']) && ctype_digit((string) $row['client_town'])) {
+                $locationIds[] = (int) $row['client_town'];
+            }
+        }
+
+        if (!empty($locationIds)) {
+            $locations = $this->getLocationsByIds($locationIds);
+        } else {
+            $locations = array();
+        }
+
+        foreach ($rows as &$row) {
+            $locationId = 0;
+            if (!empty($row['client_town_id'])) {
+                $locationId = (int) $row['client_town_id'];
+            } elseif (!empty($row['client_town']) && ctype_digit((string) $row['client_town'])) {
+                $locationId = (int) $row['client_town'];
+                $row['client_town_id'] = $locationId;
+            }
+
+            if ($locationId && isset($locations[$locationId])) {
+                $location = $locations[$locationId];
+                $row['client_town_id'] = $locationId;
+                $row['client_town'] = $location['town'] ?? ($row['client_town'] ?? '');
+                $row['client_suburb'] = $location['suburb'] ?? ($row['client_suburb'] ?? '');
+                $row['client_postal_code'] = $location['postal_code'] ?? ($row['client_postal_code'] ?? '');
+                $row['client_province'] = $location['province'] ?? ($row['client_province'] ?? '');
+                $row['client_location'] = $location;
+            } elseif ($locationId) {
+                $row['client_town_id'] = $locationId;
+            }
+        }
+        unset($row);
+
+        if ($single) {
+            $rows = reset($rows);
+        }
+    }
+
     /**
      * Filter fillable fields
      *

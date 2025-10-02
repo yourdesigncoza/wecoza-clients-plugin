@@ -175,13 +175,18 @@ return array(
             'required' => true,
             'max_length' => 500,
         ),
+        'client_province' => array(
+            'required' => true,
+            'max_length' => 50,
+        ),
         'client_suburb' => array(
             'required' => true,
             'max_length' => 255,
         ),
-        'client_town' => array(
+        'client_town_id' => array(
             'required' => true,
-            'max_length' => 255,
+            'integer' => true,
+            'min' => 1,
         ),
         'client_postal_code' => array(
             'required' => true,

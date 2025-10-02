@@ -1,8 +1,8 @@
---
--- PostgreSQL database dump
---
-
-\restrict BiO5FarrlDain7HHUUUJVYoJfmvXpgdWjgrjmcd7r338poGZHqBG2CV2hl9rc6P
+---
+--- TOC entry 5153 (class 0 OID 0)
+--- Dependencies: 225
+--- Name: COLUMN clients.province; Type: COMMENT; Schema: public; Owner: doadmin
+---
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg22.04+3)
@@ -210,6 +210,15 @@ $$;
 
 ALTER FUNCTION wecoza_events.get_unprocessed_events(limit_count integer) OWNER TO doadmin;
 
+-- TOC entry XXXX
+-- Dependencies: 225
+-- Name: COLUMN clients.province; Type: COMMENT; Schema: public; Owner: doadmin
+--
+
+COMMENT ON COLUMN public.clients.province IS 'Province where the client is located';
+
+
+---
 --
 -- TOC entry 316 (class 1255 OID 19227)
 -- Name: update_updated_at_column(); Type: FUNCTION; Schema: wecoza_events; Owner: doadmin
@@ -2208,6 +2217,7 @@ CREATE TABLE public.clients (
     address_line character varying(100),
     suburb character varying(50),
     town_id integer,
+    province character varying(50),
     postal_code character varying(10),
     seta character varying(100),
     client_status character varying(50),
