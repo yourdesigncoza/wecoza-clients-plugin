@@ -86,6 +86,20 @@ class ClientsModel {
      * @var array
      */
     protected $columnMap = [];
+
+    /**
+     * Client contacts model
+     *
+     * @var ClientContactsModel
+     */
+    protected $contactsModel;
+
+    /**
+     * Client communications model
+     *
+     * @var ClientCommunicationsModel
+     */
+    protected $communicationsModel;
     
     /**
      * Fillable fields
@@ -144,6 +158,9 @@ class ClientsModel {
         $this->resolvedPrimaryKey = $this->columnMap['id'] ?: 'id';
         $this->softDeleteEnabled = !empty($this->columnMap['deleted_at']);
         $this->branchColumnAvailable = !empty($this->columnMap['branch_of']);
+
+        $this->contactsModel = new ClientContactsModel();
+        $this->communicationsModel = new ClientCommunicationsModel();
 
         // Filter fillable fields to those that exist in the schema
         $this->fillable = array_values(array_filter($this->fillable, function ($field) {
@@ -262,6 +279,98 @@ class ClientsModel {
     }
     
     /**
+     * Extract contact data from payload
+     *
+     * @param array $data
+     * @return array
+     */
+    protected function extractContactData($data) {
+        $name = isset($data['contact_person']) ? trim($data['contact_person']) : '';
+        $email = isset($data['contact_person_email']) ? trim($data['contact_person_email']) : '';
+        $cellphone = isset($data['contact_person_cellphone']) ? trim($data['contact_person_cellphone']) : '';
+        $telephone = isset($data['contact_person_tel']) ? trim($data['contact_person_tel']) : '';
+        $position = isset($data['contact_person_position']) ? trim($data['contact_person_position']) : null;
+
+        if ($name === '' && $email === '' && $cellphone === '' && $telephone === '') {
+            return array();
+        }
+
+        return array(
+            'name' => $name,
+            'email' => $email,
+            'cellphone' => $cellphone,
+            'telephone' => $telephone,
+            'position' => $position,
+        );
+    }
+
+    /**
+     * Hydrate related data (contacts, communications) into result rows
+     *
+     * @param array $rows
+     * @return void
+     */
+    protected function hydrateRelatedData(&$rows) {
+        if (empty($rows)) {
+            return;
+        }
+
+        $single = false;
+        if (isset($rows['id'])) {
+            $rows = array($rows);
+            $single = true;
+        }
+
+        $clientIds = array();
+        foreach ($rows as $row) {
+            if (isset($row['id'])) {
+                $clientIds[] = (int) $row['id'];
+            }
+        }
+
+        $clientIds = array_values(array_unique(array_filter($clientIds)));
+        if (empty($clientIds)) {
+            if ($single) {
+                $rows = reset($rows);
+            }
+            return;
+        }
+
+        $contacts = $this->contactsModel->getPrimaryContacts($clientIds);
+        $communications = $this->communicationsModel->getLatestCommunicationTypes($clientIds);
+
+        foreach ($rows as &$row) {
+            $id = isset($row['id']) ? (int) $row['id'] : 0;
+            if (!$id) {
+                continue;
+            }
+
+            if (isset($contacts[$id])) {
+                $contact = $contacts[$id];
+                $nameParts = array_filter(array(
+                    $contact['first_name'] ?? '',
+                    $contact['surname'] ?? '',
+                ));
+
+                $row['contact_person'] = implode(' ', $nameParts);
+                $row['contact_person_email'] = $contact['email'] ?? '';
+                $row['contact_person_cellphone'] = $contact['cellphone_number'] ?? '';
+                $row['contact_person_tel'] = $contact['tel_number'] ?? '';
+            }
+
+            if (isset($communications[$id])) {
+                $row['client_communication'] = $communications[$id]['communication_type'];
+                $row['last_communication_at'] = $communications[$id]['communication_date'];
+            }
+        }
+        unset($row);
+
+        if ($single) {
+            $rows = reset($rows);
+        }
+    }
+    
+    /**
      * Get all clients
      *
      * @param array $params Query parameters
@@ -367,6 +476,10 @@ class ClientsModel {
             }
         }
         
+        if ($results) {
+            $this->hydrateRelatedData($results);
+        }
+        
         return $results ?: array();
     }
     
@@ -390,6 +503,7 @@ class ClientsModel {
         if ($result) {
             $result = $this->normalizeRow($result);
             $this->decodeJsonFields($result);
+            $this->hydrateRelatedData($result);
         }
         return $result;
     }
@@ -419,6 +533,7 @@ class ClientsModel {
         if ($result) {
             $result = $this->normalizeRow($result);
             $this->decodeJsonFields($result);
+            $this->hydrateRelatedData($result);
         }
         
         return $result;
@@ -445,8 +560,28 @@ class ClientsModel {
         if (empty($prepared)) {
             return false;
         }
-        
-        return DatabaseService::insert($this->table, $prepared);
+
+        $contactData = $this->extractContactData($data);
+        $communicationType = isset($data['client_communication']) ? trim($data['client_communication']) : '';
+
+        $clientId = DatabaseService::insert($this->table, $prepared);
+
+        if ($clientId) {
+            if (!empty($contactData)) {
+                $this->contactsModel->upsertPrimaryContact($clientId, $contactData);
+            }
+
+            if ($communicationType !== '') {
+                $this->communicationsModel->logCommunication(
+                    $clientId,
+                    $communicationType,
+                    __('Client created', 'wecoza-clients'),
+                    sprintf(__('Initial communication recorded as %s during client creation.', 'wecoza-clients'), $communicationType)
+                );
+            }
+        }
+
+        return $clientId;
     }
     
     /**
@@ -465,25 +600,46 @@ class ClientsModel {
             $data['updated_by'] = get_current_user_id();
         }
 
+        $contactData = $this->extractContactData($data);
+        $communicationType = isset($data['client_communication']) ? trim($data['client_communication']) : '';
+
         $prepared = $this->prepareDataForSave($data);
 
-        if (empty($prepared)) {
-            return true;
+        $updated = true;
+
+        if (!empty($prepared)) {
+            $whereClause = $this->resolvedPrimaryKey . ' = :id';
+            if ($this->softDeleteEnabled) {
+                $whereClause .= ' AND deleted_at IS NULL';
+            }
+
+            $result = DatabaseService::update(
+                $this->table,
+                $prepared,
+                $whereClause,
+                [':id' => $id]
+            );
+
+            $updated = $result !== false;
         }
 
-        $whereClause = $this->resolvedPrimaryKey . ' = :id';
-        if ($this->softDeleteEnabled) {
-            $whereClause .= ' AND deleted_at IS NULL';
+        if (!empty($contactData)) {
+            $this->contactsModel->upsertPrimaryContact($id, $contactData);
         }
 
-        $result = DatabaseService::update(
-            $this->table,
-            $prepared,
-            $whereClause,
-            [':id' => $id]
-        );
-        
-        return $result !== false;
+        if ($communicationType !== '') {
+            $latestType = $this->communicationsModel->getLatestCommunicationType($id);
+            if ($latestType !== $communicationType) {
+                $this->communicationsModel->logCommunication(
+                    $id,
+                    $communicationType,
+                    __('Client communication updated', 'wecoza-clients'),
+                    sprintf(__('Communication type updated to %s.', 'wecoza-clients'), $communicationType)
+                );
+            }
+        }
+
+        return $updated;
     }
     
     /**
@@ -688,6 +844,10 @@ class ClientsModel {
                 $row = $this->normalizeRow($row);
                 $this->decodeJsonFields($row);
             }
+        }
+        
+        if ($results) {
+            $this->hydrateRelatedData($results);
         }
         
         return $results ?: array();
