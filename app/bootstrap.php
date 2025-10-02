@@ -200,11 +200,3 @@ add_action('init', function() {
         define('WECOZA_CLIENTS_INITIALIZED', true);
     }
 }, 10);
-
-// Initialize immediately if called directly
-if (!did_action('init')) {
-    init();
-    if (!defined('WECOZA_CLIENTS_INITIALIZED')) {
-        define('WECOZA_CLIENTS_INITIALIZED', true);
-    }
-}

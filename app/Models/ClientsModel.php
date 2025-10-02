@@ -90,6 +90,13 @@ class ClientsModel {
     protected $columnMap = [];
 
     /**
+     * Cached column maps per table
+     *
+     * @var array<string,array>
+     */
+    protected static $columnMapCache = array();
+
+    /**
      * Client contacts model
      *
      * @var ClientContactsModel
@@ -182,8 +189,16 @@ class ClientsModel {
      * Constructor
      */
     public function __construct() {
-        foreach ($this->columnCandidates as $field => $candidates) {
-            $this->columnMap[$field] = $this->resolveColumn($candidates);
+        $cacheKey = $this->table;
+
+        if (isset(self::$columnMapCache[$cacheKey])) {
+            $this->columnMap = self::$columnMapCache[$cacheKey];
+        } else {
+            foreach ($this->columnCandidates as $field => $candidates) {
+                $this->columnMap[$field] = $this->resolveColumn($candidates);
+            }
+
+            self::$columnMapCache[$cacheKey] = $this->columnMap;
         }
 
         $this->resolvedPrimaryKey = $this->columnMap['id'] ?: 'id';

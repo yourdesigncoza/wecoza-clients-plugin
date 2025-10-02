@@ -14,18 +14,16 @@ use WeCozaClients\Helpers\ViewHelpers;
 class ClientsController {
     
     /**
-     * Model instance
+     * Model instance (lazily loaded)
      *
-     * @var ClientsModel
+     * @var ClientsModel|null
      */
-    protected $model;
+    protected $model = null;
     
     /**
      * Constructor
      */
     public function __construct() {
-        $this->model = new ClientsModel();
-        
         // Register shortcodes
         $this->registerShortcodes();
         
@@ -34,6 +32,19 @@ class ClientsController {
         
         // Enqueue assets
         add_action('wp_enqueue_scripts', array($this, 'enqueueAssets'));
+    }
+
+    /**
+     * Get model instance on-demand
+     *
+     * @return ClientsModel
+     */
+    protected function getModel() {
+        if ($this->model === null) {
+            $this->model = new ClientsModel();
+        }
+
+        return $this->model;
     }
     
     /**
@@ -56,9 +67,11 @@ class ClientsController {
         add_action('wp_ajax_wecoza_search_clients', array($this, 'ajaxSearchClients'));
         add_action('wp_ajax_wecoza_get_branch_clients', array($this, 'ajaxGetBranchClients'));
         add_action('wp_ajax_wecoza_export_clients', array($this, 'ajaxExportClients'));
+        add_action('wp_ajax_wecoza_get_locations', array($this, 'ajaxGetLocations'));
         
         // Non-logged in users (if needed)
         add_action('wp_ajax_nopriv_wecoza_search_clients', array($this, 'ajaxSearchClients'));
+        add_action('wp_ajax_nopriv_wecoza_get_locations', array($this, 'ajaxGetLocations'));
     }
     
     /**
@@ -93,7 +106,8 @@ class ClientsController {
                 'wecoza_clients',
                 $this->getLocalizationPayload($nonce, array(
                     'locations' => array(
-                        'hierarchy' => $this->model->getLocationHierarchy(),
+                        'hierarchy' => array(),
+                        'lazyLoad' => true,
                     ),
                 ))
             );
@@ -141,6 +155,7 @@ class ClientsController {
                 'search' => 'wecoza_search_clients',
                 'branches' => 'wecoza_get_branch_clients',
                 'export' => 'wecoza_export_clients',
+                'locations' => 'wecoza_get_locations',
             ),
             'messages' => array(
                 'form' => array(
@@ -166,6 +181,25 @@ class ClientsController {
 
         return array_replace_recursive($base, $overrides);
     }
+
+    /**
+     * AJAX handler to fetch locations lazily
+     */
+    public function ajaxGetLocations() {
+        check_ajax_referer('wecoza_clients_ajax', 'nonce');
+
+        $hierarchy = $this->getModel()->getLocationHierarchy();
+
+        if (!is_array($hierarchy)) {
+            wp_send_json_error(array(
+                'message' => __('Unable to load locations right now. Please try again shortly.', 'wecoza-clients'),
+            ), 500);
+        }
+
+        wp_send_json_success(array(
+            'hierarchy' => $hierarchy,
+        ));
+    }
     
     /**
      * Client capture form shortcode
@@ -189,7 +223,7 @@ class ClientsController {
         
         // Get client data if editing
         if ($atts['id']) {
-            $client = $this->model->getById($atts['id']);
+            $client = $this->getModel()->getById($atts['id']);
             if (!$client) {
                 return '<p>' . __('Client not found.', 'wecoza-clients') . '</p>';
             }
@@ -211,7 +245,7 @@ class ClientsController {
         }
         
         // Get dropdown data
-        $branches = $this->model->getForDropdown();
+        $branches = $this->getModel()->getForDropdown();
         $config = \WeCozaClients\config('app');
         $seta_options = $config['seta_options'];
         $status_options = $config['client_status_options'];
@@ -222,7 +256,7 @@ class ClientsController {
         $selectedLocationId = !empty($client['client_town_id']) ? (int) $client['client_town_id'] : null;
         $selectedPostal = $client['client_postal_code'] ?? ($client['client_location']['postal_code'] ?? '');
 
-        $hierarchy = $this->model->getLocationHierarchy();
+        $hierarchy = $this->getModel()->getLocationHierarchy();
 
         $locationData = array(
             'hierarchy' => $hierarchy,
@@ -282,12 +316,12 @@ class ClientsController {
         );
         
         // Get clients
-        $clients = $this->model->getAll($params);
-        $total = $this->model->count($params);
+        $clients = $this->getModel()->getAll($params);
+        $total = $this->getModel()->count($params);
         $totalPages = ceil($total / $atts['per_page']);
         
         // Get statistics
-        $stats = $this->model->getStatistics();
+        $stats = $this->getModel()->getStatistics();
         
         // Get filter options
         $config = \WeCozaClients\config('app');
@@ -336,18 +370,18 @@ class ClientsController {
         }
         
         // Get client data
-        $client = $this->model->getById($atts['id']);
+        $client = $this->getModel()->getById($atts['id']);
         if (!$client) {
             return '<p>' . __('Client not found.', 'wecoza-clients') . '</p>';
         }
         
         // Get branch clients
-        $branchClients = $this->model->getBranchClients($client['id']);
+        $branchClients = $this->getModel()->getBranchClients($client['id']);
         
         // Get parent client if this is a branch
         $parentClient = null;
         if ($client['branch_of']) {
-            $parentClient = $this->model->getById($client['branch_of']);
+            $parentClient = $this->getModel()->getById($client['branch_of']);
         }
         
         // Load view
@@ -368,7 +402,7 @@ class ClientsController {
         $data = $this->sanitizeFormData($_POST);
         
         // Validate data
-        $errors = $this->model->validate($data, $clientId);
+        $errors = $this->getModel()->validate($data, $clientId);
         if (!empty($errors)) {
             return array(
                 'success' => false,
@@ -392,10 +426,10 @@ class ClientsController {
         
         // Save client
         if ($clientId) {
-            $success = $this->model->update($clientId, $data);
+            $success = $this->getModel()->update($clientId, $data);
             $message = __('Client updated successfully!', 'wecoza-clients');
         } else {
-            $clientId = $this->model->create($data);
+            $clientId = $this->getModel()->create($data);
             $success = $clientId !== false;
             $message = __('Client created successfully!', 'wecoza-clients');
         }
@@ -408,7 +442,7 @@ class ClientsController {
         }
         
         // Get updated client data
-        $client = $this->model->getById($clientId);
+        $client = $this->getModel()->getById($clientId);
         
         return array(
             'success' => true,
@@ -453,7 +487,7 @@ class ClientsController {
         if (isset($data['client_town_id'])) {
             $townId = intval($data['client_town_id']);
             if ($townId > 0) {
-                $location = $this->model->getLocationById($townId);
+                $location = $this->getModel()->getLocationById($townId);
                 if ($location) {
                     $sanitized['client_town_id'] = $townId;
                     $sanitized['client_suburb'] = $location['suburb'] ?? ($sanitized['client_suburb'] ?? '');
@@ -561,7 +595,7 @@ class ClientsController {
             wp_die(json_encode(array('success' => false, 'message' => 'Invalid client ID.')));
         }
         
-        $client = $this->model->getById($clientId);
+        $client = $this->getModel()->getById($clientId);
         if (!$client) {
             wp_die(json_encode(array('success' => false, 'message' => 'Client not found.')));
         }
@@ -588,7 +622,7 @@ class ClientsController {
             wp_die(json_encode(array('success' => false, 'message' => 'Invalid client ID.')));
         }
         
-        $success = $this->model->delete($clientId);
+        $success = $this->getModel()->delete($clientId);
         
         wp_die(json_encode(array(
             'success' => $success,
@@ -613,7 +647,7 @@ class ClientsController {
         $search = isset($_GET['search']) ? sanitize_text_field($_GET['search']) : '';
         $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;
         
-        $clients = $this->model->getAll(array(
+        $clients = $this->getModel()->getAll(array(
             'search' => $search,
             'limit' => $limit,
         ));
@@ -640,7 +674,7 @@ class ClientsController {
             wp_die(json_encode(array('success' => false, 'message' => 'Invalid parent ID.')));
         }
         
-        $clients = $this->model->getBranchClients($parentId);
+        $clients = $this->getModel()->getBranchClients($parentId);
         
         wp_die(json_encode(array('success' => true, 'clients' => $clients)));
     }
@@ -660,7 +694,7 @@ class ClientsController {
         }
         
         // Get all clients
-        $clients = $this->model->getAll();
+        $clients = $this->getModel()->getAll();
         
         // Set headers for CSV download
         header('Content-Type: text/csv; charset=utf-8');

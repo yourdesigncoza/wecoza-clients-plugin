@@ -121,6 +121,12 @@ return array(
             'capability' => 'export_wecoza_clients',
             'nonce' => 'wecoza_clients_ajax',
         ),
+        'get_locations' => array(
+            'controller' => 'WeCozaClients\\Controllers\\ClientsController',
+            'method' => 'ajaxGetLocations',
+            'capability' => 'view_wecoza_clients',
+            'nonce' => 'wecoza_clients_ajax',
+        ),
     ),
 
     /**

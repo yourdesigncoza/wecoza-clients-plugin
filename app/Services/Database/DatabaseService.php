@@ -43,6 +43,7 @@ class DatabaseService {
     private static $schemaCache = array(
         'columns' => array(),
         'relations' => array(),
+        'table_columns' => array(),
     );
     
     /**
@@ -429,6 +430,61 @@ class DatabaseService {
     }
 
     /**
+     * Fetch all column names for a table
+     *
+     * @param string $table Table name (optionally schema-qualified)
+     * @return array
+     */
+    public static function getTableColumns($table) {
+        if (empty($table)) {
+            return array();
+        }
+
+        $cacheKey = strtolower($table);
+        if (isset(self::$schemaCache['table_columns'][$cacheKey])) {
+            return self::$schemaCache['table_columns'][$cacheKey];
+        }
+
+        $pdo = self::getConnection();
+        if (!$pdo) {
+            return array();
+        }
+
+        $schema = null;
+        $tableName = $table;
+
+        if (strpos($table, '.') !== false) {
+            list($schema, $tableName) = explode('.', $table, 2);
+        }
+
+        $sql = 'SELECT column_name FROM information_schema.columns WHERE table_name = :table';
+        $params = array(
+            ':table' => $tableName,
+        );
+
+        if ($schema) {
+            $sql .= ' AND table_schema = :schema';
+            $params[':schema'] = $schema;
+        } else {
+            $sql .= ' AND table_schema = ANY (current_schemas(false))';
+        }
+
+        $sql .= ' ORDER BY ordinal_position';
+
+        try {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $columns = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: array();
+        } catch (PDOException $e) {
+            self::logError('Schema columns fetch failed: ' . $e->getMessage());
+            $columns = array();
+        }
+
+        self::$schemaCache['table_columns'][$cacheKey] = $columns;
+        return $columns;
+    }
+
+    /**
      * Check if a table has a specific column
      *
      * @param string $table Table name
@@ -445,41 +501,8 @@ class DatabaseService {
             return self::$schemaCache['columns'][$cacheKey];
         }
 
-        $pdo = self::getConnection();
-        if (!$pdo) {
-            return false;
-        }
-
-        $schema = null;
-        $tableName = $table;
-
-        if (strpos($table, '.') !== false) {
-            list($schema, $tableName) = explode('.', $table, 2);
-        }
-
-        $sql = 'SELECT 1 FROM information_schema.columns WHERE table_name = :table AND column_name = :column';
-        $params = array(
-            ':table' => $tableName,
-            ':column' => $column,
-        );
-
-        if ($schema) {
-            $sql .= ' AND table_schema = :schema';
-            $params[':schema'] = $schema;
-        } else {
-            $sql .= ' AND table_schema = ANY (current_schemas(false))';
-        }
-
-        $sql .= ' LIMIT 1';
-
-        try {
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($params);
-            $exists = $stmt->fetchColumn() !== false;
-        } catch (PDOException $e) {
-            self::logError('Schema check failed: ' . $e->getMessage());
-            $exists = false;
-        }
+        $columns = self::getTableColumns($table);
+        $exists = in_array($column, $columns, true);
 
         self::$schemaCache['columns'][$cacheKey] = $exists;
         return $exists;

@@ -72,6 +72,42 @@
         };
 
         var hierarchy = (config.locations && $.isArray(config.locations.hierarchy)) ? config.locations.hierarchy : [];
+        var locationRequest = null;
+        var loadHierarchyIfNeeded = function () {
+            if (hierarchy.length) {
+                return $.Deferred().resolve(hierarchy).promise();
+            }
+
+            if (!config.actions || !config.actions.locations) {
+                return $.Deferred().resolve(hierarchy).promise();
+            }
+
+            if (locationRequest) {
+                return locationRequest;
+            }
+
+            locationRequest = $.ajax({
+                url: config.ajaxUrl,
+                method: 'POST',
+                dataType: 'json',
+                data: {
+                    action: config.actions.locations,
+                    nonce: config.nonce
+                }
+            }).done(function (response) {
+                if (response && response.success && response.data && $.isArray(response.data.hierarchy)) {
+                    hierarchy = response.data.hierarchy;
+                } else if (response && response.data && response.data.message) {
+                    renderMessage('error', response.data.message);
+                }
+            }).fail(function () {
+                renderMessage('error', config.messages.general.error);
+            }).always(function () {
+                locationRequest = null;
+            });
+
+            return locationRequest;
+        };
         var provinceSelect = form.find('.js-province-select');
         var townSelect = form.find('.js-town-select');
         var suburbSelect = form.find('.js-suburb-select');
@@ -398,6 +434,12 @@
         }
 
         initializeLocations();
+
+        if (config.locations && config.locations.lazyLoad && !hierarchy.length) {
+            loadHierarchyIfNeeded().done(function () {
+                initializeLocations();
+            });
+        }
 
         form.on('submit', function (event) {
             if (!form[0].checkValidity()) {
