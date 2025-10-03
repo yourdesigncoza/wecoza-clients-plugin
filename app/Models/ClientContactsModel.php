@@ -19,22 +19,25 @@ class ClientContactsModel {
     public function upsertPrimaryContact($clientId, array $contactData) {
         $clientId = (int) $clientId;
         $email = isset($contactData['email']) ? trim($contactData['email']) : '';
+        $siteId = isset($contactData['site_id']) ? (int) $contactData['site_id'] : 0;
 
-        if ($clientId <= 0 || $email === '') {
+        if ($clientId <= 0 || $email === '' || $siteId <= 0) {
             return false;
         }
 
         $names = $this->resolveNames($contactData);
 
-        $sql = 'INSERT INTO client_contact_persons (client_id, first_name, surname, email, cellphone_number, tel_number, "position")
-                VALUES (:client_id, :first_name, :surname, :email, :cellphone_number, :tel_number, :position)
+        $sql = 'INSERT INTO client_contact_persons (client_id, first_name, surname, email, cellphone_number, tel_number, "position", site_id, is_primary)
+                VALUES (:client_id, :first_name, :surname, :email, :cellphone_number, :tel_number, :position, :site_id, :is_primary)
                 ON CONFLICT (client_id, email) DO UPDATE SET
                     first_name = EXCLUDED.first_name,
                     surname = EXCLUDED.surname,
                     cellphone_number = EXCLUDED.cellphone_number,
                     tel_number = EXCLUDED.tel_number,
-                    "position" = EXCLUDED."position"
-                RETURNING contact_id, client_id, first_name, surname, email, cellphone_number, tel_number, "position"';
+                    "position" = EXCLUDED."position",
+                    site_id = EXCLUDED.site_id,
+                    is_primary = EXCLUDED.is_primary
+                RETURNING contact_id, client_id, first_name, surname, email, cellphone_number, tel_number, "position", site_id, is_primary';
 
         return DatabaseService::getRow($sql, array(
             ':client_id' => $clientId,
@@ -44,6 +47,8 @@ class ClientContactsModel {
             ':cellphone_number' => isset($contactData['cellphone']) ? trim($contactData['cellphone']) : null,
             ':tel_number' => isset($contactData['telephone']) ? trim($contactData['telephone']) : null,
             ':position' => $contactData['position'] ?? null,
+            ':site_id' => $siteId,
+            ':is_primary' => true,
         ));
     }
 
@@ -84,7 +89,9 @@ class ClientContactsModel {
                     email,
                     cellphone_number,
                     tel_number,
-                    "position"
+                    "position",
+                    site_id,
+                    is_primary
                 FROM client_contact_persons
                 WHERE client_id IN (' . implode(',', $placeholders) . ')
                 ORDER BY client_id, contact_id ASC';

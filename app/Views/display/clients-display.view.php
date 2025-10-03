@@ -17,7 +17,6 @@ $stats = wp_parse_args(
         'leads' => 0,
         'cold_calls' => 0,
         'lost_clients' => 0,
-        'branch_clients' => 0,
     )
 );
 
@@ -95,14 +94,6 @@ $statusBadgeMap = array(
                 </div>
             </div>
         </div>
-        <div class="col-sm-6 col-lg-2">
-            <div class="card h-100 border-0 shadow-sm">
-                <div class="card-body py-3">
-                    <p class="text-uppercase text-muted fs-10 mb-1"><?php esc_html_e('Branches', 'wecoza-clients'); ?></p>
-                    <p class="fs-4 fw-semibold text-info mb-0"><?php echo esc_html((int)$stats['branch_clients']); ?></p>
-                </div>
-            </div>
-        </div>
     </div>
 
     <?php if ($showSearch || $showFilters) : ?>
@@ -176,6 +167,9 @@ $statusBadgeMap = array(
                         <tr>
                             <td>
                                 <span class="fw-semibold"><?php echo esc_html($client['client_name'] ?? ''); ?></span>
+                                <?php if (!empty($client['site_name'])) : ?>
+                                    <div class="text-muted fs-10"><?php echo esc_html($client['site_name']); ?></div>
+                                <?php endif; ?>
                                 <?php if (!empty($client['client_town'])) : ?>
                                     <div class="text-muted fs-10"><?php echo esc_html($client['client_town']); ?></div>
                                 <?php endif; ?>

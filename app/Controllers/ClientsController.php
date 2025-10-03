@@ -46,6 +46,15 @@ class ClientsController {
 
         return $this->model;
     }
+
+    /**
+     * Get sites model instance
+     *
+     * @return SitesModel
+     */
+    protected function getSitesModel() {
+        return $this->getModel()->getSitesModel();
+    }
     
     /**
      * Register shortcodes
@@ -209,7 +218,7 @@ class ClientsController {
      */
     public function captureClientShortcode($atts) {
         // Check permissions
-        if (!current_user_can('create_wecoza_clients')) {
+        if (!current_user_can('manage_wecoza_clients')) {
             return '<p>' . __('You do not have permission to create clients.', 'wecoza-clients') . '</p>';
         }
         
@@ -220,6 +229,8 @@ class ClientsController {
         $client = null;
         $errors = array();
         $success = false;
+        $submittedClient = array();
+        $submittedSite = array();
         
         // Get client data if editing
         if ($atts['id']) {
@@ -240,15 +251,44 @@ class ClientsController {
                     $client = $result['client'];
                 } else {
                     $errors = $result['errors'];
+                    if (!empty($result['data']['client']) && is_array($result['data']['client'])) {
+                        $submittedClient = $result['data']['client'];
+                    }
+                    if (!empty($result['data']['site']) && is_array($result['data']['site'])) {
+                        $submittedSite = $result['data']['site'];
+                    }
                 }
             }
         }
+
+        if (!empty($submittedClient)) {
+            $client = array_merge(is_array($client) ? $client : array(), $submittedClient);
+        }
         
         // Get dropdown data
-        $branches = $this->getModel()->getForDropdown();
         $config = \WeCozaClients\config('app');
         $seta_options = $config['seta_options'];
         $status_options = $config['client_status_options'];
+
+        $sitesData = array('head' => null, 'sub_sites' => array());
+        if (!empty($client['id'])) {
+            $sitesData = $this->getSitesModel()->getSitesByClient($client['id']);
+        if (!empty($submittedSite)) {
+            $sitesData['head'] = array_merge($sitesData['head'] ?? array(), $submittedSite);
+            if (!empty($submittedSite['place_id'])) {
+                $client['client_town_id'] = $submittedSite['place_id'];
+            }
+            if (!empty($submittedSite['address_line_1'])) {
+                $client['client_street_address'] = $submittedSite['address_line_1'];
+            }
+            if (!empty($submittedSite['address_line_2'])) {
+                $client['client_address_line_2'] = $submittedSite['address_line_2'];
+            }
+            if (!empty($submittedSite['site_name'])) {
+                $client['site_name'] = $submittedSite['site_name'];
+            }
+        }
+        }
 
         $selectedProvince = $client['client_province'] ?? ($client['client_location']['province'] ?? '');
         $selectedTown = $client['client_town'] ?? ($client['client_location']['town'] ?? '');
@@ -256,7 +296,7 @@ class ClientsController {
         $selectedLocationId = !empty($client['client_town_id']) ? (int) $client['client_town_id'] : null;
         $selectedPostal = $client['client_postal_code'] ?? ($client['client_location']['postal_code'] ?? '');
 
-        $hierarchy = $this->getModel()->getLocationHierarchy();
+        $hierarchy = $this->getSitesModel()->getLocationHierarchy();
 
         $locationData = array(
             'hierarchy' => $hierarchy,
@@ -274,10 +314,10 @@ class ClientsController {
             'client' => $client,
             'errors' => $errors,
             'success' => $success,
-            'branches' => $branches,
             'seta_options' => $seta_options,
             'status_options' => $status_options,
             'location_data' => $locationData,
+            'sites' => $sitesData,
         ));
     }
     
@@ -375,20 +415,11 @@ class ClientsController {
             return '<p>' . __('Client not found.', 'wecoza-clients') . '</p>';
         }
         
-        // Get branch clients
-        $branchClients = $this->getModel()->getBranchClients($client['id']);
-        
-        // Get parent client if this is a branch
-        $parentClient = null;
-        if ($client['branch_of']) {
-            $parentClient = $this->getModel()->getById($client['branch_of']);
-        }
-        
-        // Load view
+        $sites = $this->getSitesModel()->getSitesByClient($client['id']);
+
         return \WeCozaClients\view('display/single-client-display', array(
             'client' => $client,
-            'branchClients' => $branchClients,
-            'parentClient' => $parentClient,
+            'sites' => $sites,
         ));
     }
     
@@ -399,55 +430,103 @@ class ClientsController {
      * @return array
      */
     protected function handleFormSubmission($clientId = 0) {
-        $data = $this->sanitizeFormData($_POST);
-        
-        // Validate data
-        $errors = $this->getModel()->validate($data, $clientId);
+        $payload = $this->sanitizeFormData($_POST);
+        $clientData = $payload['client'];
+        $siteData = $payload['site'];
+        $contactData = $payload['contact'];
+        $communicationType = $payload['communication_type'];
+        $isNew = ((int) $clientId) <= 0;
+
+        $errors = $this->getModel()->validate($clientData, $clientId);
+        $siteErrors = $this->getSitesModel()->validateHeadSite($siteData);
+
+        if ($siteErrors) {
+            foreach ($siteErrors as $field => $message) {
+                $errors['site_' . $field] = $message;
+            }
+        }
+
         if (!empty($errors)) {
             return array(
                 'success' => false,
                 'errors' => $errors,
+                'data' => array(
+                    'client' => $clientData,
+                    'site' => $siteData,
+                ),
             );
         }
-        
-        // Handle file upload
-        if (!empty($_FILES['quotes']) && !empty($_FILES['quotes']['name'])) {
-            $uploadResult = $this->handleFileUpload($_FILES['quotes']);
-            if ($uploadResult['success']) {
-                $data['quotes'] = $uploadResult['path'];
-            } else {
-                $errors['quotes'] = $uploadResult['error'];
+
+        if (!$isNew) {
+            $updated = $this->getModel()->update($clientId, $clientData);
+            if (!$updated) {
                 return array(
                     'success' => false,
-                    'errors' => $errors,
+                    'errors' => array('general' => __('Failed to update client. Please try again.', 'wecoza-clients')),
+                    'data' => array(
+                        'client' => $clientData,
+                        'site' => $siteData,
+                    ),
+                );
+            }
+        } else {
+            $clientId = $this->getModel()->create($clientData);
+            if (!$clientId) {
+                return array(
+                    'success' => false,
+                    'errors' => array('general' => __('Failed to create client. Please try again.', 'wecoza-clients')),
+                    'data' => array(
+                        'client' => $clientData,
+                        'site' => $siteData,
+                    ),
                 );
             }
         }
-        
-        // Save client
-        if ($clientId) {
-            $success = $this->getModel()->update($clientId, $data);
-            $message = __('Client updated successfully!', 'wecoza-clients');
-        } else {
-            $clientId = $this->getModel()->create($data);
-            $success = $clientId !== false;
-            $message = __('Client created successfully!', 'wecoza-clients');
-        }
-        
-        if (!$success) {
+
+        $siteData['site_name_fallback'] = $clientData['client_name'] ?? '';
+        if (!empty($siteData['site_id']) && !$this->getSitesModel()->ensureSiteBelongsToClient($siteData['site_id'], $clientId)) {
             return array(
                 'success' => false,
-                'errors' => array('general' => __('Failed to save client. Please try again.', 'wecoza-clients')),
+                'errors' => array('site_site_id' => __('Selected site does not belong to this client.', 'wecoza-clients')),
+                'data' => array(
+                    'client' => $clientData,
+                    'site' => $siteData,
+                ),
             );
         }
-        
-        // Get updated client data
+
+        $siteId = $this->getSitesModel()->saveHeadSite($clientId, $siteData);
+        if (!$siteId) {
+            return array(
+                'success' => false,
+                'errors' => array('general' => __('Failed to save site details. Please try again.', 'wecoza-clients')),
+                'data' => array(
+                    'client' => $clientData,
+                    'site' => $siteData,
+                ),
+            );
+        }
+
+        $contactModel = $this->getModel()->getContactsModel();
+        if (!empty($contactData['email']) || !empty($contactData['cellphone']) || !empty($contactData['telephone']) || !empty($contactData['name'])) {
+            $contactData['site_id'] = $siteId;
+            $contactModel->upsertPrimaryContact($clientId, $contactData);
+        }
+
+        if ($communicationType !== '') {
+            $communicationsModel = $this->getModel()->getCommunicationsModel();
+            $latestType = $communicationsModel->getLatestCommunicationType($clientId);
+            if ($latestType !== $communicationType) {
+                $communicationsModel->logCommunication($clientId, $siteId, $communicationType);
+            }
+        }
+
         $client = $this->getModel()->getById($clientId);
-        
+
         return array(
             'success' => true,
             'client' => $client,
-            'message' => $message,
+            'message' => $isNew ? __('Client created successfully!', 'wecoza-clients') : __('Client saved successfully!', 'wecoza-clients'),
         );
     }
     
@@ -458,61 +537,61 @@ class ClientsController {
      * @return array
      */
     protected function sanitizeFormData($data) {
-        $sanitized = array();
-        
-        // Text fields
-        $textFields = array(
-            'client_name', 'company_registration_nr', 'client_street_address',
-            'client_suburb', 'client_postal_code', 'client_province', 'client_town_name',
-            'contact_person', 'contact_person_cellphone', 'contact_person_tel',
-            'client_communication', 'seta', 'client_status'
+        $client = array();
+
+        $client['client_name'] = isset($data['client_name']) ? sanitize_text_field($data['client_name']) : '';
+        $client['company_registration_nr'] = isset($data['company_registration_nr']) ? sanitize_text_field($data['company_registration_nr']) : '';
+        $client['seta'] = isset($data['seta']) ? sanitize_text_field($data['seta']) : '';
+        $client['client_status'] = isset($data['client_status']) ? sanitize_text_field($data['client_status']) : '';
+        $client['financial_year_end'] = isset($data['financial_year_end']) ? sanitize_text_field($data['financial_year_end']) : '';
+        $client['bbbee_verification_date'] = isset($data['bbbee_verification_date']) ? sanitize_text_field($data['bbbee_verification_date']) : '';
+
+        $client['contact_person'] = isset($data['contact_person']) ? sanitize_text_field($data['contact_person']) : '';
+        $client['contact_person_email'] = isset($data['contact_person_email']) ? sanitize_email($data['contact_person_email']) : '';
+        $client['contact_person_cellphone'] = isset($data['contact_person_cellphone']) ? sanitize_text_field($data['contact_person_cellphone']) : '';
+        $client['contact_person_tel'] = isset($data['contact_person_tel']) ? sanitize_text_field($data['contact_person_tel']) : '';
+        $client['contact_person_position'] = isset($data['contact_person_position']) ? sanitize_text_field($data['contact_person_position']) : '';
+        $client['client_communication'] = isset($data['client_communication']) ? sanitize_text_field($data['client_communication']) : '';
+
+        $client['client_suburb'] = isset($data['client_suburb']) ? sanitize_text_field($data['client_suburb']) : '';
+        $client['client_postal_code'] = isset($data['client_postal_code']) ? sanitize_text_field($data['client_postal_code']) : '';
+        $client['client_province'] = isset($data['client_province']) ? sanitize_text_field($data['client_province']) : '';
+        $client['client_town'] = isset($data['client_town_name']) ? sanitize_text_field($data['client_town_name']) : (isset($data['client_town']) ? sanitize_text_field($data['client_town']) : '');
+
+        $placeId = isset($data['client_town_id']) ? (int) $data['client_town_id'] : 0;
+        $client['client_town_id'] = $placeId;
+        if ($placeId > 0) {
+            $location = $this->getSitesModel()->getLocationById($placeId);
+            if ($location) {
+                $client['client_suburb'] = $location['suburb'] ?? $client['client_suburb'];
+                $client['client_postal_code'] = $location['postal_code'] ?? $client['client_postal_code'];
+                $client['client_province'] = $location['province'] ?? $client['client_province'];
+                $client['client_town'] = $location['town'] ?? $client['client_town'];
+            }
+        }
+
+        $site = array(
+            'site_id' => isset($data['head_site_id']) ? (int) $data['head_site_id'] : 0,
+            'site_name' => isset($data['head_site_name']) ? sanitize_text_field($data['head_site_name']) : '',
+            'address_line_1' => isset($data['client_street_address']) ? sanitize_text_field($data['client_street_address']) : '',
+            'address_line_2' => isset($data['client_address_line_2']) ? sanitize_text_field($data['client_address_line_2']) : '',
+            'place_id' => $placeId,
         );
-        
-        foreach ($textFields as $field) {
-            if (isset($data[$field])) {
-                $sanitized[$field] = sanitize_text_field($data[$field]);
-            }
-        }
-        
-        // Email field
-        if (isset($data['contact_person_email'])) {
-            $sanitized['contact_person_email'] = sanitize_email($data['contact_person_email']);
-        }
-        
-        // Integer fields
-        if (isset($data['branch_of']) && $data['branch_of']) {
-            $sanitized['branch_of'] = intval($data['branch_of']);
-        }
 
-        if (isset($data['client_town_id'])) {
-            $townId = intval($data['client_town_id']);
-            if ($townId > 0) {
-                $location = $this->getModel()->getLocationById($townId);
-                if ($location) {
-                    $sanitized['client_town_id'] = $townId;
-                    $sanitized['client_suburb'] = $location['suburb'] ?? ($sanitized['client_suburb'] ?? '');
-                    $sanitized['client_postal_code'] = $location['postal_code'] ?? ($sanitized['client_postal_code'] ?? '');
-                    $sanitized['client_province'] = $location['province'] ?? ($sanitized['client_province'] ?? '');
-                    $sanitized['client_town'] = $location['town'] ?? '';
-                }
-            }
-        }
+        $contact = array(
+            'name' => $client['contact_person'],
+            'email' => $client['contact_person_email'],
+            'cellphone' => $client['contact_person_cellphone'],
+            'telephone' => $client['contact_person_tel'],
+            'position' => $client['contact_person_position'] ?? '',
+        );
 
-        if (!empty($sanitized['client_town_name']) && empty($sanitized['client_town'])) {
-            $sanitized['client_town'] = $sanitized['client_town_name'];
-        }
-
-        unset($sanitized['client_town_name']);
-        
-        // Date fields
-        $dateFields = array('financial_year_end', 'bbbee_verification_date');
-        foreach ($dateFields as $field) {
-            if (isset($data[$field]) && $data[$field]) {
-                $sanitized[$field] = sanitize_text_field($data[$field]);
-            }
-        }
-        
-        return $sanitized;
+        return array(
+            'client' => $client,
+            'site' => $site,
+            'contact' => $contact,
+            'communication_type' => $client['client_communication'],
+        );
     }
     
     /**
@@ -564,9 +643,8 @@ class ClientsController {
         
         // Check permissions
         $clientId = isset($_POST['id']) ? intval($_POST['id']) : 0;
-        $capability = $clientId ? 'edit_wecoza_clients' : 'create_wecoza_clients';
         
-        if (!current_user_can($capability)) {
+        if (!current_user_can('manage_wecoza_clients')) {
             wp_die(json_encode(array('success' => false, 'message' => 'Permission denied.')));
         }
         
@@ -613,7 +691,7 @@ class ClientsController {
         }
         
         // Check permissions
-        if (!current_user_can('delete_wecoza_clients')) {
+        if (!current_user_can('manage_wecoza_clients')) {
             wp_die(json_encode(array('success' => false, 'message' => 'Permission denied.')));
         }
         
@@ -669,14 +747,14 @@ class ClientsController {
             wp_die(json_encode(array('success' => false, 'message' => 'Permission denied.')));
         }
         
-        $parentId = isset($_GET['parent_id']) ? intval($_GET['parent_id']) : 0;
-        if (!$parentId) {
-            wp_die(json_encode(array('success' => false, 'message' => 'Invalid parent ID.')));
+        $clientId = isset($_GET['client_id']) ? intval($_GET['client_id']) : 0;
+        if (!$clientId) {
+            wp_die(json_encode(array('success' => false, 'message' => 'Invalid client ID.')));
         }
-        
-        $clients = $this->getModel()->getBranchClients($parentId);
-        
-        wp_die(json_encode(array('success' => true, 'clients' => $clients)));
+
+        $sites = $this->getSitesModel()->getSitesByClient($clientId);
+
+        wp_die(json_encode(array('success' => true, 'sites' => $sites)));
     }
     
     /**

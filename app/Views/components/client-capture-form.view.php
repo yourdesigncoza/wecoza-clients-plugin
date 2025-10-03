@@ -12,12 +12,19 @@ use WeCozaClients\Helpers\ViewHelpers;
 $client = $client ?? null;
 $errors = $errors ?? array();
 $success = $success ?? false;
-$branches = $branches ?? array();
 $seta_options = $seta_options ?? array();
 $status_options = $status_options ?? array();
 $location_data = $location_data ?? array();
 $location_selected = $location_data['selected'] ?? array();
 $location_hierarchy = $location_data['hierarchy'] ?? array();
+$sites = $sites ?? array('head' => null, 'sub_sites' => array());
+
+$headSite = $sites['head'] ?? null;
+
+$headSiteId = $headSite['site_id'] ?? ($client['site_id'] ?? '');
+$headSiteName = $headSite['site_name'] ?? ($client['site_name'] ?? ($client['client_name'] ?? ''));
+$headSiteAddress1 = $headSite['address_line_1'] ?? ($client['client_street_address'] ?? '');
+$headSiteAddress2 = $headSite['address_line_2'] ?? ($client['client_address_line_2'] ?? '');
 
 $selected_province = $location_selected['province'] ?? ($client['client_province'] ?? '');
 $selected_town = $location_selected['town'] ?? ($client['client_town'] ?? '');
@@ -111,6 +118,7 @@ $is_edit = !empty($client['id']);
         
         <!-- Basic Information -->
         <div class="row">
+            <input type="hidden" name="head_site_id" value="<?php echo esc_attr($headSiteId); ?>">
             <?php
             echo ViewHelpers::renderField('text', 'client_name', 'Client Name', 
                 $client['client_name'] ?? '', 
@@ -121,20 +129,12 @@ $is_edit = !empty($client['id']);
                 )
             );
             
-            // Prepare branch options
-            $branch_options = array('' => 'Select');
-            foreach ($branches as $branch) {
-                if (!$is_edit || $branch['id'] != $client['id']) {
-                    $branch_options[$branch['id']] = $branch['client_name'] . ' (' . $branch['company_registration_nr'] . ')';
-                }
-            }
-            
-            echo ViewHelpers::renderField('select', 'branch_of', 'Branch of', 
-                $client['branch_of'] ?? '', 
+            echo ViewHelpers::renderField('text', 'head_site_name', 'Head Site Name', 
+                $headSiteName, 
                 array(
+                    'required' => true,
                     'col_class' => 'col-md-4',
-                    'options' => $branch_options,
-                    'error' => $errors['branch_of'] ?? ''
+                    'error' => $errors['site_site_name'] ?? ''
                 )
             );
             
@@ -183,7 +183,7 @@ $is_edit = !empty($client['id']);
                     'col_class' => 'col-md-4 js-suburb-field' . ($has_town ? '' : ' d-none'),
                     'class' => 'js-suburb-select',
                     'options' => $suburb_options,
-                    'error' => $errors['client_town_id'] ?? ($errors['client_suburb'] ?? '')
+                    'error' => $errors['client_town_id'] ?? ($errors['client_suburb'] ?? ($errors['site_place_id'] ?? ''))
                 )
             );
             ?>
@@ -195,11 +195,19 @@ $is_edit = !empty($client['id']);
         <div class="row mt-3">
             <?php
             echo ViewHelpers::renderField('text', 'client_street_address', 'Client Street Address', 
-                $client['client_street_address'] ?? '', 
+                $headSiteAddress1, 
                 array(
                     'required' => true,
                     'col_class' => 'col-md-6 js-address-field' . ($has_location ? '' : ' d-none'),
-                    'error' => $errors['client_street_address'] ?? ''
+                    'error' => $errors['site_address_line_1'] ?? ($errors['client_street_address'] ?? '')
+                )
+            );
+
+            echo ViewHelpers::renderField('text', 'client_address_line_2', 'Address Line 2', 
+                $headSiteAddress2, 
+                array(
+                    'col_class' => 'col-md-6 js-address-2-field' . ($has_location ? '' : ' d-none'),
+                    'error' => $errors['site_address_line_2'] ?? ''
                 )
             );
 
@@ -262,16 +270,6 @@ $is_edit = !empty($client['id']);
         <!-- Business Information -->
         <div class="row">
             <?php
-            echo ViewHelpers::renderField('file', 'quotes', 'Quotes', 
-                $client['quotes'] ?? '', 
-                array(
-                    'col_class' => 'col-md-6',
-                    'multiple' => true,
-                    'accept' => '.pdf,.doc,.docx,.xls,.xlsx',
-                    'error' => $errors['quotes'] ?? ''
-                )
-            );
-            
             // Prepare status options for select
             $comm_options = array();
             foreach ($status_options as $key => $value) {

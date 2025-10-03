@@ -12,11 +12,12 @@ class ClientCommunicationsModel {
     /**
      * Record a communication entry for a client
      */
-    public function logCommunication($clientId, $type, $subject = null, $content = null, $userId = null) {
+    public function logCommunication($clientId, $siteId, $type, $subject = null, $content = null, $userId = null) {
         $clientId = (int) $clientId;
+        $siteId = (int) $siteId;
         $type = trim((string) $type);
 
-        if ($clientId <= 0 || $type === '') {
+        if ($clientId <= 0 || $siteId <= 0 || $type === '') {
             return false;
         }
 
@@ -33,11 +34,12 @@ class ClientCommunicationsModel {
             $userId = $currentUser ?: null;
         }
 
-        $sql = 'INSERT INTO client_communications (client_id, communication_type, subject, content, user_id)
-                VALUES (:client_id, :communication_type, :subject, :content, :user_id)';
+        $sql = 'INSERT INTO client_communications (client_id, site_id, communication_type, subject, content, user_id)
+                VALUES (:client_id, :site_id, :communication_type, :subject, :content, :user_id)';
 
         $params = array(
             ':client_id' => $clientId,
+            ':site_id' => $siteId,
             ':communication_type' => $type,
             ':subject' => $subject,
             ':content' => $content,
@@ -56,7 +58,7 @@ class ClientCommunicationsModel {
             return null;
         }
 
-        $sql = 'SELECT communication_id, client_id, communication_type, subject, content, communication_date, user_id
+        $sql = 'SELECT communication_id, client_id, communication_type, subject, content, communication_date, user_id, site_id
                 FROM client_communications
                 WHERE client_id = :client_id
                 ORDER BY communication_date DESC, communication_id DESC
@@ -93,7 +95,8 @@ class ClientCommunicationsModel {
                     subject,
                     content,
                     communication_date,
-                    user_id
+                    user_id,
+                    site_id
                 FROM client_communications
                 WHERE client_id IN (' . implode(',', $placeholders) . ')
                 ORDER BY client_id, communication_date DESC, communication_id DESC';
@@ -127,6 +130,7 @@ class ClientCommunicationsModel {
             $map[$clientId] = array(
                 'communication_type' => $row['communication_type'],
                 'communication_date' => $row['communication_date'],
+                'site_id' => isset($row['site_id']) ? (int) $row['site_id'] : null,
             );
         }
 

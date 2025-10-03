@@ -114,8 +114,10 @@
         var townWrapper = form.find('.js-town-field');
         var suburbWrapper = form.find('.js-suburb-field');
         var addressWrapper = form.find('.js-address-field');
+        var address2Wrapper = form.find('.js-address-2-field');
         var postalWrapper = form.find('.js-postal-field');
         var addressInput = addressWrapper.find('input[name="client_street_address"]');
+        var address2Input = address2Wrapper.find('input[name="client_address_line_2"]');
         var postalInput = postalWrapper.find('input[name="client_postal_code"]');
         var suburbHidden = form.find('.js-suburb-hidden');
         var townHidden = form.find('.js-town-hidden');
@@ -273,6 +275,7 @@
         var showAddressWrapper = function () {
             addressWrapper.removeClass('d-none');
             toggleRequired(addressInput, true);
+            address2Wrapper.removeClass('d-none');
         };
 
         var hideAddressWrapper = function (clearValue) {
@@ -280,6 +283,10 @@
             toggleRequired(addressInput, false);
             if (clearValue && addressInput.length) {
                 addressInput.val('');
+            }
+            address2Wrapper.addClass('d-none');
+            if (clearValue && address2Input.length) {
+                address2Input.val('');
             }
         };
 
@@ -474,6 +481,13 @@
                             idInput = $('<input>', { type: 'hidden', name: 'id' }).appendTo(form);
                         }
                         idInput.val(response.client.id);
+
+                        if (response.client.head_site && response.client.head_site.site_id) {
+                            form.find('input[name="head_site_id"]').val(response.client.head_site.site_id);
+                            if (response.client.head_site.site_name && !form.find('input[name="head_site_name"]').val()) {
+                                form.find('input[name="head_site_name"]').val(response.client.head_site.site_name);
+                            }
+                        }
                     }
 
                     form.trigger('wecoza:client-saved', [response]);

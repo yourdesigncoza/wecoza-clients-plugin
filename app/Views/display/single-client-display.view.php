@@ -3,8 +3,9 @@
 use WeCozaClients\Helpers\ViewHelpers;
 
 $client = is_array($client ?? null) ? $client : array();
-$branchClients = is_array($branchClients ?? null) ? $branchClients : array();
-$parentClient = is_array($parentClient ?? null) ? $parentClient : null;
+$sites = is_array($sites ?? null) ? $sites : array('head' => null, 'sub_sites' => array());
+$headSite = $sites['head'] ?? null;
+$subSites = $sites['sub_sites'] ?? array();
 
 $baseUrl = get_permalink();
 if (!$baseUrl) {
@@ -23,12 +24,24 @@ $statusBadgeMap = array(
 $statusLabel = $client['client_status'] ?? '';
 $statusClass = $statusBadgeMap[$statusLabel] ?? 'badge-phoenix-secondary';
 
-$addressParts = array_filter(array(
-    $client['client_street_address'] ?? '',
-    $client['client_suburb'] ?? '',
-    $client['client_town'] ?? '',
-    $client['client_postal_code'] ?? '',
-));
+$addressParts = array();
+if ($headSite) {
+    $addressParts = array_filter(array(
+        $headSite['address_line_1'] ?? '',
+        $headSite['address_line_2'] ?? '',
+        $headSite['location']['suburb'] ?? ($client['client_suburb'] ?? ''),
+        $headSite['location']['town'] ?? ($client['client_town'] ?? ''),
+        $headSite['location']['province'] ?? ($client['client_province'] ?? ''),
+        $headSite['location']['postal_code'] ?? ($client['client_postal_code'] ?? ''),
+    ));
+} else {
+    $addressParts = array_filter(array(
+        $client['client_street_address'] ?? '',
+        $client['client_suburb'] ?? '',
+        $client['client_town'] ?? '',
+        $client['client_postal_code'] ?? '',
+    ));
+}
 
 $formatListValue = function ($value) {
     if (is_array($value)) {
@@ -147,7 +160,7 @@ $renderDataList = function ($items) use ($formatListValue) {
 
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white border-0">
-                    <h3 class="h6 mb-0"><?php esc_html_e('Address', 'wecoza-clients'); ?></h3>
+                    <h3 class="h6 mb-0"><?php esc_html_e('Head Site Address', 'wecoza-clients'); ?></h3>
                 </div>
                 <div class="card-body">
                     <?php if (!empty($addressParts)) : ?>
@@ -188,70 +201,68 @@ $renderDataList = function ($items) use ($formatListValue) {
                 </div>
             </div>
 
-            <?php if ($parentClient) : ?>
-                <?php
-                $parentLink = isset($parentClient['id']) ? add_query_arg(array('client_id' => (int) $parentClient['id']), $baseUrl) : '';
-                ?>
-                <div class="card border-0 shadow-sm mb-4">
-                    <div class="card-header bg-white border-0">
-                        <h3 class="h6 mb-0"><?php esc_html_e('Parent Client', 'wecoza-clients'); ?></h3>
-                    </div>
-                    <div class="card-body small">
-                        <p class="fw-semibold mb-1"><?php echo esc_html($parentClient['client_name'] ?? ''); ?></p>
-                        <?php if (!empty($parentClient['company_registration_nr'])) : ?>
-                            <p class="text-muted mb-2"><?php esc_html_e('Registration #', 'wecoza-clients'); ?>: <?php echo esc_html($parentClient['company_registration_nr']); ?></p>
-                        <?php endif; ?>
-                        <?php if ($parentLink) : ?>
-                            <a class="btn btn-phoenix-secondary btn-sm" href="<?php echo esc_url($parentLink); ?>"><?php esc_html_e('View Parent', 'wecoza-clients'); ?></a>
-                        <?php endif; ?>
-                    </div>
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-0">
+                    <h3 class="h6 mb-0"><?php esc_html_e('Head Site', 'wecoza-clients'); ?></h3>
                 </div>
-            <?php endif; ?>
+                <div class="card-body small">
+                    <?php if ($headSite) : ?>
+                        <p class="fw-semibold mb-1"><?php echo esc_html($headSite['site_name'] ?? __('Head Site', 'wecoza-clients')); ?></p>
+                        <?php if (!empty($headSite['site_id'])) : ?>
+                            <p class="text-muted mb-2"><?php esc_html_e('Site ID', 'wecoza-clients'); ?>: <?php echo esc_html((string) $headSite['site_id']); ?></p>
+                        <?php endif; ?>
+                        <?php if (!empty($headSite['address_line_1'])) : ?>
+                            <p class="mb-0"><?php echo esc_html($headSite['address_line_1']); ?></p>
+                            <?php if (!empty($headSite['address_line_2'])) : ?>
+                                <p class="mb-0"><?php echo esc_html($headSite['address_line_2']); ?></p>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                        <?php if (!empty($headSite['location'])) : ?>
+                            <p class="text-muted mb-0">
+                                <?php echo esc_html(implode(', ', array_filter([
+                                    $headSite['location']['suburb'] ?? '',
+                                    $headSite['location']['town'] ?? '',
+                                    $headSite['location']['province'] ?? '',
+                                    $headSite['location']['postal_code'] ?? '',
+                                ]))); ?>
+                            </p>
+                        <?php endif; ?>
+                    <?php else : ?>
+                        <p class="text-muted mb-0"><?php esc_html_e('No head site captured yet.', 'wecoza-clients'); ?></p>
+                    <?php endif; ?>
+                </div>
+            </div>
         </div>
     </div>
 
-    <?php if (!empty($branchClients)) : ?>
+    <?php if (!empty($subSites)) : ?>
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
-                <h3 class="h6 mb-0"><?php esc_html_e('Branch Clients', 'wecoza-clients'); ?></h3>
-                <span class="badge bg-light text-dark"><?php echo esc_html(count($branchClients)); ?></span>
+                <h3 class="h6 mb-0"><?php esc_html_e('Sub-sites', 'wecoza-clients'); ?></h3>
+                <span class="badge bg-light text-dark"><?php echo esc_html(count($subSites)); ?></span>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-sm mb-0 align-middle">
                         <thead class="table-light">
                             <tr>
-                                <th scope="col"><?php esc_html_e('Client', 'wecoza-clients'); ?></th>
-                                <th scope="col"><?php esc_html_e('Registration #', 'wecoza-clients'); ?></th>
-                                <th scope="col"><?php esc_html_e('Status', 'wecoza-clients'); ?></th>
-                                <th scope="col" class="text-end"><?php esc_html_e('Actions', 'wecoza-clients'); ?></th>
+                                <th scope="col"><?php esc_html_e('Site', 'wecoza-clients'); ?></th>
+                                <th scope="col"><?php esc_html_e('Address', 'wecoza-clients'); ?></th>
+                                <th scope="col"><?php esc_html_e('Suburb', 'wecoza-clients'); ?></th>
+                                <th scope="col"><?php esc_html_e('Town', 'wecoza-clients'); ?></th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($branchClients as $branch) : ?>
-                                <?php
-                                $branchStatus = $branch['client_status'] ?? '';
-                                $branchClass = $statusBadgeMap[$branchStatus] ?? 'badge-phoenix-secondary';
-                                $branchLink = isset($branch['id']) ? add_query_arg(array('client_id' => (int) $branch['id']), $baseUrl) : '';
-                                ?>
+                            <?php foreach ($subSites as $site) : ?>
+                                <?php $location = $site['location'] ?? array(); ?>
                                 <tr>
                                     <td>
-                                        <span class="fw-semibold"><?php echo esc_html($branch['client_name'] ?? ''); ?></span>
-                                        <?php if (!empty($branch['client_town'])) : ?>
-                                            <div class="text-muted fs-10"><?php echo esc_html($branch['client_town']); ?></div>
-                                        <?php endif; ?>
+                                        <span class="fw-semibold"><?php echo esc_html($site['site_name'] ?? ''); ?></span>
+                                        <div class="text-muted fs-10"><?php echo esc_html(sprintf(__('Site #%d', 'wecoza-clients'), (int) ($site['site_id'] ?? 0))); ?></div>
                                     </td>
-                                    <td><?php echo esc_html($branch['company_registration_nr'] ?? ''); ?></td>
-                                    <td>
-                                        <?php if ($branchStatus) : ?>
-                                            <span class="badge badge-phoenix fs-10 <?php echo esc_attr($branchClass); ?>"><?php echo esc_html($branchStatus); ?></span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="text-end">
-                                        <?php if ($branchLink) : ?>
-                                            <a class="btn btn-phoenix-secondary btn-sm" href="<?php echo esc_url($branchLink); ?>"><?php esc_html_e('View Branch', 'wecoza-clients'); ?></a>
-                                        <?php endif; ?>
-                                    </td>
+                                    <td><?php echo esc_html($site['address_line_1'] ?? ''); ?></td>
+                                    <td><?php echo esc_html($location['suburb'] ?? ''); ?></td>
+                                    <td><?php echo esc_html($location['town'] ?? ''); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -262,7 +273,7 @@ $renderDataList = function ($items) use ($formatListValue) {
     <?php else : ?>
         <div class="card border-0 shadow-sm">
             <div class="card-body">
-                <?php echo ViewHelpers::renderAlert(__('No branch clients linked.', 'wecoza-clients'), 'info', false); ?>
+                <?php echo ViewHelpers::renderAlert(__('No additional sites linked.', 'wecoza-clients'), 'info', false); ?>
             </div>
         </div>
     <?php endif; ?>

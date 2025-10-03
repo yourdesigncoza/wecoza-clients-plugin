@@ -266,8 +266,8 @@ return array(
      */
     'capabilities' => array(
         'manage_wecoza_clients' => array('administrator'),
-        'create_wecoza_clients' => array('administrator', 'editor'),
-        'edit_wecoza_clients' => array('administrator', 'editor'),
+        'create_wecoza_clients' => array('administrator'),
+        'edit_wecoza_clients' => array('administrator'),
         'delete_wecoza_clients' => array('administrator'),
         'view_wecoza_clients' => array('administrator', 'editor', 'author'),
         'export_wecoza_clients' => array('administrator'),
