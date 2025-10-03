@@ -24,8 +24,6 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// var_dump( get_transient( 'wecoza_clients_location_cache' ) );
-
 // Define plugin constants
 // Keep asset versions stable so browsers can cache them properly
 define('WECOZA_CLIENTS_VERSION', '1.0.0');

@@ -158,7 +158,7 @@ $is_edit = !empty($client['id']);
                 $selected_province, 
                 array(
                     'required' => true,
-                    'col_class' => 'col-md-4 js-province-field',
+                    'col_class' => 'col-md-3 js-province-field',
                     'class' => 'js-province-select',
                     'options' => $province_options,
                     'error' => $errors['client_province'] ?? ''
@@ -169,7 +169,7 @@ $is_edit = !empty($client['id']);
                 $selected_town, 
                 array(
                     'required' => true,
-                    'col_class' => 'col-md-4 js-town-field' . ($has_province ? '' : ' d-none'),
+                    'col_class' => 'col-md-3 js-town-field' . ($has_province ? '' : ' d-none'),
                     'class' => 'js-town-select',
                     'options' => $town_options,
                     'error' => ''
@@ -180,10 +180,20 @@ $is_edit = !empty($client['id']);
                 $selected_location_id, 
                 array(
                     'required' => true,
-                    'col_class' => 'col-md-4 js-suburb-field' . ($has_town ? '' : ' d-none'),
+                    'col_class' => 'col-md-3 js-suburb-field' . ($has_town ? '' : ' d-none'),
                     'class' => 'js-suburb-select',
                     'options' => $suburb_options,
                     'error' => $errors['client_town_id'] ?? ($errors['client_suburb'] ?? ($errors['site_place_id'] ?? ''))
+                )
+            );
+
+            echo ViewHelpers::renderField('text', 'client_postal_code', 'Client Postal Code', 
+                $selected_postal_code, 
+                array(
+                    'required' => true,
+                    'readonly' => true,
+                    'col_class' => 'col-md-3 js-postal-field' . ($has_location ? '' : ' d-none'),
+                    'error' => $errors['client_postal_code'] ?? ''
                 )
             );
             ?>
@@ -208,16 +218,6 @@ $is_edit = !empty($client['id']);
                 array(
                     'col_class' => 'col-md-6 js-address-2-field' . ($has_location ? '' : ' d-none'),
                     'error' => $errors['site_address_line_2'] ?? ''
-                )
-            );
-
-            echo ViewHelpers::renderField('text', 'client_postal_code', 'Client Postal Code', 
-                $selected_postal_code, 
-                array(
-                    'required' => true,
-                    'readonly' => true,
-                    'col_class' => 'col-md-6 js-postal-field' . ($has_location ? '' : ' d-none'),
-                    'error' => $errors['client_postal_code'] ?? ''
                 )
             );
             ?>
