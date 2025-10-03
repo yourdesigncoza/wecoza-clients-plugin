@@ -221,11 +221,11 @@ class ViewHelpers {
      */
     public static function renderAlert($message, $type = 'info', $dismissible = true) {
         $typeClasses = array(
-            'success' => 'alert-success',
-            'error' => 'alert-danger',
-            'warning' => 'alert-warning',
-            'info' => 'alert-info',
-            'discovery' => 'alert-discovery',
+            'success' => 'alert-subtle-success',
+            'error' => 'alert-subtle-danger',
+            'warning' => 'alert-subtle-warning',
+            'info' => 'alert-subtle-info',
+            'discovery' => 'alert-subtle-primary',
         );
         
         $typeIcons = array(
@@ -233,10 +233,10 @@ class ViewHelpers {
             'error' => 'fa-circle-exclamation icon-danger',
             'warning' => 'fa-triangle-exclamation icon-warning',
             'info' => 'fa-circle-info icon-info',
-            'discovery' => 'fa-circle-question icon-discovery',
+            'discovery' => 'fa-circle-question icon-primary',
         );
         
-        $alertClass = isset($typeClasses[$type]) ? $typeClasses[$type] : 'alert-info';
+        $alertClass = isset($typeClasses[$type]) ? $typeClasses[$type] : 'alert-subtle-info';
         $iconClass = isset($typeIcons[$type]) ? $typeIcons[$type] : 'fa-circle-info icon-info';
         
         ob_start();

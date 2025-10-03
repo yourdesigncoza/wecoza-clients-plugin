@@ -58,6 +58,7 @@ return array(
      */
     'controllers' => array(
         'WeCozaClients\\Controllers\\ClientsController',
+        'WeCozaClients\\Controllers\\LocationsController',
     ),
 
     /**
@@ -78,6 +79,11 @@ return array(
             'controller' => 'WeCozaClients\\Controllers\\ClientsController',
             'method' => 'displaySingleClientShortcode',
             'description' => 'Display single client details',
+        ),
+        'wecoza_locations_capture' => array(
+            'controller' => 'WeCozaClients\\Controllers\\LocationsController',
+            'method' => 'captureLocationShortcode',
+            'description' => 'Display locations capture form',
         ),
     ),
 
@@ -151,6 +157,11 @@ return array(
                 'file' => 'js/client-search.js',
                 'deps' => array('jquery'),
                 'shortcodes' => array('wecoza_display_clients'),
+            ),
+            'location-capture' => array(
+                'file' => 'js/location-capture.js',
+                'deps' => array('jquery'),
+                'shortcodes' => array('wecoza_locations_capture'),
             ),
         ),
     ),
@@ -249,6 +260,18 @@ return array(
         'TETA',
         'W&RSETA',
         'merSETA',
+    ),
+
+    'province_options' => array(
+        'Eastern Cape',
+        'Free State',
+        'Gauteng',
+        'KwaZulu-Natal',
+        'Limpopo',
+        'Mpumalanga',
+        'Northern Cape',
+        'North West',
+        'Western Cape',
     ),
 
     /**

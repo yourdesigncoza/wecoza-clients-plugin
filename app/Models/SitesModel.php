@@ -29,12 +29,15 @@ class SitesModel {
         if (self::$locationCache === null) {
             $cached = $this->loadLocationCache();
             if (!is_array($cached) || !isset($cached['hierarchy'], $cached['map'])) {
-                $cached = array(
-                    'hierarchy' => array(),
-                    'map' => array(),
-                );
+                $cached = $this->rebuildLocationCache();
             }
+
+            if (!is_array($cached) || !isset($cached['hierarchy'], $cached['map'])) {
+                $cached = $this->buildLocationCache();
+            }
+
             self::$locationCache = $cached;
+            $this->locationsEnabled = !empty($cached['hierarchy']) || !empty($cached['map']);
         }
 
         return self::$locationCache;
@@ -60,7 +63,7 @@ class SitesModel {
 
     public function refreshLocationCache() {
         self::$locationCache = null;
-        return $this->ensureLocationCache();
+        return $this->rebuildLocationCache();
     }
 
     public function clearLocationCache() {
@@ -71,10 +74,106 @@ class SitesModel {
             'hierarchy' => array(),
             'map' => array(),
         );
+        $this->locationsEnabled = false;
     }
 
     protected function persistLocationCache(array $cache) {
-        // No-op: cache population is managed externally.
+        $key = $this->getLocationCacheKey();
+        set_transient($key, $cache, 0);
+        update_option($key, $cache, false);
+    }
+
+    protected function fetchAllLocations() {
+        $sql = 'SELECT location_id, suburb, town, province, postal_code, longitude, latitude FROM public.locations ORDER BY province, town, suburb, location_id';
+        $rows = DatabaseService::getAll($sql) ?: array();
+
+        return array_map(function ($row) {
+            return array(
+                'location_id' => isset($row['location_id']) ? (int) $row['location_id'] : 0,
+                'suburb' => isset($row['suburb']) ? trim((string) $row['suburb']) : '',
+                'town' => isset($row['town']) ? trim((string) $row['town']) : '',
+                'province' => isset($row['province']) ? trim((string) $row['province']) : '',
+                'postal_code' => isset($row['postal_code']) ? trim((string) $row['postal_code']) : '',
+                'longitude' => isset($row['longitude']) ? (float) $row['longitude'] : null,
+                'latitude' => isset($row['latitude']) ? (float) $row['latitude'] : null,
+            );
+        }, $rows);
+    }
+
+    public function rebuildLocationCache() {
+        $rows = $this->fetchAllLocations();
+
+        $hierarchy = array();
+        $provinceIndex = array();
+        $townIndex = array();
+        $map = array();
+
+        foreach ($rows as $row) {
+            $id = $row['location_id'];
+            if ($id <= 0) {
+                continue;
+            }
+
+            $suburb = $row['suburb'];
+            $town = $row['town'];
+            $province = $row['province'];
+            $postal = $row['postal_code'];
+
+            $map[$id] = array(
+                'id' => $id,
+                'suburb' => $suburb,
+                'town' => $town,
+                'province' => $province,
+                'postal_code' => $postal,
+                'longitude' => $row['longitude'],
+                'latitude' => $row['latitude'],
+            );
+
+            if ($province === '' || $town === '' || $suburb === '') {
+                continue;
+            }
+
+            if (!isset($provinceIndex[$province])) {
+                $provinceIndex[$province] = count($hierarchy);
+                $hierarchy[] = array(
+                    'name' => $province,
+                    'towns' => array(),
+                );
+            }
+
+            $provincePos = $provinceIndex[$province];
+
+            if (!isset($townIndex[$province])) {
+                $townIndex[$province] = array();
+            }
+
+            if (!isset($townIndex[$province][$town])) {
+                $townIndex[$province][$town] = count($hierarchy[$provincePos]['towns']);
+                $hierarchy[$provincePos]['towns'][] = array(
+                    'name' => $town,
+                    'suburbs' => array(),
+                );
+            }
+
+            $townPos = $townIndex[$province][$town];
+
+            $hierarchy[$provincePos]['towns'][$townPos]['suburbs'][] = array(
+                'id' => $id,
+                'name' => $suburb,
+                'postal_code' => $postal,
+            );
+        }
+
+        $cache = array(
+            'hierarchy' => $hierarchy,
+            'map' => $map,
+        );
+
+        self::$locationCache = $cache;
+        $this->persistLocationCache($cache);
+        $this->locationsEnabled = !empty($map);
+
+        return $cache;
     }
 
     protected function getHeadSiteCacheKey() {

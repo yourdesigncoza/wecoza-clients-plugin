@@ -206,6 +206,8 @@ class DatabaseService {
             if (!self::tableHasColumn($table, 'id')) {
                 if (self::tableHasColumn($table, 'client_id')) {
                     $returningColumn = 'client_id';
+                } elseif (self::tableHasColumn($table, 'location_id')) {
+                    $returningColumn = 'location_id';
                 } else {
                     $returningColumn = null;
                 }
