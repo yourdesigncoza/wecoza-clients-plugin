@@ -109,6 +109,29 @@ class LocationsModel {
         return !empty($row);
     }
 
+    public function checkDuplicates($suburb, $town) {
+        $conditions = array();
+        $params = array();
+        
+        if (!empty($suburb)) {
+            $conditions[] = 'LOWER(suburb) = LOWER(:suburb)';
+            $params[':suburb'] = $suburb;
+        }
+        
+        if (!empty($town)) {
+            $conditions[] = 'LOWER(town) = LOWER(:town)';
+            $params[':town'] = $town;
+        }
+        
+        if (empty($conditions)) {
+            return array();
+        }
+        
+        $sql = 'SELECT location_id, suburb, town, province, postal_code FROM public.locations WHERE ' . implode(' OR ', $conditions) . ' ORDER BY suburb, town LIMIT 10';
+        
+        return DatabaseService::getAll($sql, $params);
+    }
+
     protected function normalizeCoordinate($value) {
         if ($value === null) {
             return null;

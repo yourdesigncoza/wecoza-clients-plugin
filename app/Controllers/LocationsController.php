@@ -11,6 +11,10 @@ class LocationsController {
     public function __construct() {
         add_shortcode('wecoza_locations_capture', array($this, 'captureLocationShortcode'));
         add_action('wp_enqueue_scripts', array($this, 'enqueueAssets'));
+        
+        // Register AJAX handlers
+        add_action('wp_ajax_check_location_duplicates', array($this, 'ajaxCheckLocationDuplicates'));
+        add_action('wp_ajax_nopriv_check_location_duplicates', array($this, 'ajaxCheckLocationDuplicates'));
     }
 
     protected function getModel() {
@@ -71,6 +75,15 @@ class LocationsController {
                     'selectProvince' => __('Please choose a province.', 'wecoza-clients'),
                     'requiredFields' => __('Please complete all required fields.', 'wecoza-clients'),
                 ),
+            )
+        );
+
+        // Also localize WordPress AJAX URL
+        wp_localize_script(
+            'wecoza-location-capture',
+            'wecoza_ajax',
+            array(
+                'ajax_url' => admin_url('admin-ajax.php'),
             )
         );
     }
@@ -162,6 +175,43 @@ class LocationsController {
             'latitude' => isset($data['latitude']) ? sanitize_text_field(str_replace(',', '.', $data['latitude'])) : '',
             'longitude' => isset($data['longitude']) ? sanitize_text_field(str_replace(',', '.', $data['longitude'])) : '',
         );
+    }
+
+    public function ajaxCheckLocationDuplicates() {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'wecoza_locations_form')) {
+            wp_die(json_encode(array(
+                'success' => false,
+                'data' => 'Security check failed'
+            )));
+        }
+
+        // Check capabilities
+        if (!current_user_can('view_wecoza_clients')) {
+            wp_die(json_encode(array(
+                'success' => false,
+                'data' => 'Insufficient permissions'
+            )));
+        }
+
+        $suburb = isset($_POST['suburb']) ? sanitize_text_field($_POST['suburb']) : '';
+        $town = isset($_POST['town']) ? sanitize_text_field($_POST['town']) : '';
+
+        if (empty($suburb) && empty($town)) {
+            wp_die(json_encode(array(
+                'success' => false,
+                'data' => 'Please provide suburb or town for duplicate check'
+            )));
+        }
+
+        $duplicates = $this->getModel()->checkDuplicates($suburb, $town);
+
+        wp_die(json_encode(array(
+            'success' => true,
+            'data' => array(
+                'duplicates' => $duplicates
+            )
+        )));
     }
 
     protected function getGoogleMapsApiKey() {

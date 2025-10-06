@@ -133,6 +133,12 @@ return array(
             'capability' => 'view_wecoza_clients',
             'nonce' => 'wecoza_clients_ajax',
         ),
+        'check_location_duplicates' => array(
+            'controller' => 'WeCozaClients\\Controllers\\LocationsController',
+            'method' => 'ajaxCheckLocationDuplicates',
+            'capability' => 'view_wecoza_clients',
+            'nonce' => 'wecoza_locations_form',
+        ),
     ),
 
     /**
