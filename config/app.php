@@ -137,7 +137,7 @@ return array(
             'controller' => 'WeCozaClients\\Controllers\\LocationsController',
             'method' => 'ajaxCheckLocationDuplicates',
             'capability' => 'view_wecoza_clients',
-            'nonce' => 'wecoza_locations_form',
+            'nonce' => 'submit_locations_form',
         ),
     ),
 

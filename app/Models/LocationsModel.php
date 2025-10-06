@@ -20,6 +20,12 @@ class LocationsModel {
         $provinceOptions = \WeCozaClients\config('app')['province_options'] ?? array();
         $provinceOptions = array_map('strtolower', $provinceOptions);
 
+        if (empty($data['street_address'])) {
+            $errors['street_address'] = __('Street address is required.', 'wecoza-clients');
+        } elseif (strlen($data['street_address']) > 200) {
+            $errors['street_address'] = __('Street address must not exceed 200 characters.', 'wecoza-clients');
+        }
+
         if (empty($data['suburb'])) {
             $errors['suburb'] = __('Suburb is required.', 'wecoza-clients');
         } elseif (strlen($data['suburb']) > 50) {
@@ -61,7 +67,7 @@ class LocationsModel {
             $errors['latitude'] = __('Latitude must be between -90 and 90.', 'wecoza-clients');
         }
 
-        if (empty($errors) && $this->locationExists($data['suburb'], $data['town'], $data['province'], $data['postal_code'])) {
+        if (empty($errors) && $this->locationExists($data['street_address'], $data['suburb'], $data['town'], $data['province'], $data['postal_code'])) {
             $errors['general'] = __('This location already exists.', 'wecoza-clients');
         }
 
@@ -73,6 +79,7 @@ class LocationsModel {
         $latitude = $this->normalizeCoordinate($data['latitude']);
 
         $payload = array(
+            'street_address' => $data['street_address'],
             'suburb' => $data['suburb'],
             'town' => $data['town'],
             'province' => $data['province'],
@@ -92,14 +99,15 @@ class LocationsModel {
         $this->sitesModel->refreshLocationCache();
 
         return DatabaseService::getRow(
-            'SELECT location_id, suburb, town, province, postal_code, longitude, latitude FROM public.locations WHERE location_id = :id',
+            'SELECT location_id, street_address, suburb, town, province, postal_code, longitude, latitude FROM public.locations WHERE location_id = :id',
             array(':id' => (int) $locationId)
         );
     }
 
-    protected function locationExists($suburb, $town, $province, $postalCode) {
-        $sql = 'SELECT location_id FROM public.locations WHERE LOWER(suburb) = LOWER(:suburb) AND LOWER(town) = LOWER(:town) AND LOWER(province) = LOWER(:province) AND postal_code = :postal LIMIT 1';
+    protected function locationExists($streetAddress, $suburb, $town, $province, $postalCode) {
+        $sql = 'SELECT location_id FROM public.locations WHERE LOWER(street_address) = LOWER(:street_address) AND LOWER(suburb) = LOWER(:suburb) AND LOWER(town) = LOWER(:town) AND LOWER(province) = LOWER(:province) AND postal_code = :postal LIMIT 1';
         $row = DatabaseService::getRow($sql, array(
+            ':street_address' => $streetAddress,
             ':suburb' => $suburb,
             ':town' => $town,
             ':province' => $province,
@@ -109,27 +117,46 @@ class LocationsModel {
         return !empty($row);
     }
 
-    public function checkDuplicates($suburb, $town) {
+    public function checkDuplicates($streetAddress, $suburb, $town) {
         $conditions = array();
         $params = array();
         
-        if (!empty($suburb)) {
-            $conditions[] = 'LOWER(suburb) = LOWER(:suburb)';
-            $params[':suburb'] = $suburb;
+        // Build flexible search conditions - check both town and suburb for any search term
+        if (!empty($town)) {
+            $conditions[] = '(LOWER(town) LIKE LOWER(:town_search) OR LOWER(suburb) LIKE LOWER(:town_search_suburb))';
+            $params[':town_search'] = '%' . $town . '%';
+            $params[':town_search_suburb'] = '%' . $town . '%';
         }
         
-        if (!empty($town)) {
-            $conditions[] = 'LOWER(town) = LOWER(:town)';
-            $params[':town'] = $town;
+        if (!empty($suburb)) {
+            $conditions[] = '(LOWER(suburb) LIKE LOWER(:suburb_search) OR LOWER(town) LIKE LOWER(:suburb_search_town))';
+            $params[':suburb_search'] = '%' . $suburb . '%';
+            $params[':suburb_search_town'] = '%' . $suburb . '%';
+        }
+        
+        if (!empty($streetAddress)) {
+            // Add exact match first, then LIKE as fallback
+            $conditions[] = '(LOWER(street_address) = LOWER(:street_address_exact) OR LOWER(street_address) LIKE LOWER(:street_address_like))';
+            $params[':street_address_exact'] = trim($streetAddress);
+            $params[':street_address_like'] = '%' . trim($streetAddress) . '%';
         }
         
         if (empty($conditions)) {
             return array();
         }
         
-        $sql = 'SELECT location_id, suburb, town, province, postal_code FROM public.locations WHERE ' . implode(' OR ', $conditions) . ' ORDER BY suburb, town LIMIT 10';
+        $sql = 'SELECT location_id, street_address, suburb, town, province, postal_code FROM public.locations WHERE ' . implode(' OR ', $conditions) . ' ORDER BY street_address, suburb, town LIMIT 10';
         
-        return DatabaseService::getAll($sql, $params);
+        // Debug: Log the SQL and params for troubleshooting
+        // error_log('Duplicate check SQL: ' . $sql);
+        // error_log('Duplicate check params: ' . print_r($params, true));
+        
+        $results = DatabaseService::getAll($sql, $params);
+        
+        // Debug: Log the results
+        // error_log('Duplicate check results: ' . print_r($results, true));
+        
+        return $results;
     }
 
     protected function normalizeCoordinate($value) {

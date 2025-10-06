@@ -58,6 +58,13 @@ foreach ($provinces as $province) {
 
         <div class="row g-3">
             <?php
+            echo ViewHelpers::renderField('text', 'street_address', __('Street Address', 'wecoza-clients'), $location['street_address'] ?? '', array(
+                'required' => true,
+                'col_class' => 'col-md-4',
+                'error' => $errors['street_address'] ?? '',
+                'placeholder' => 'e.g. 123 Main Street',
+            ));
+
             echo ViewHelpers::renderField('text', 'suburb', __('Suburb', 'wecoza-clients'), $location['suburb'] ?? '', array(
                 'required' => true,
                 'col_class' => 'col-md-4',
@@ -69,27 +76,27 @@ foreach ($provinces as $province) {
                 'col_class' => 'col-md-4',
                 'error' => $errors['town'] ?? '',
             ));
-
-            echo ViewHelpers::renderField('select', 'province', __('Province', 'wecoza-clients'), $location['province'] ?? '', array(
-                'required' => true,
-                'col_class' => 'col-md-4',
-                'options' => $provinceOptions,
-                'error' => $errors['province'] ?? '',
-            ));
             ?>
         </div>
 
         <div class="row g-3 mt-1">
             <?php
+            echo ViewHelpers::renderField('select', 'province', __('Province', 'wecoza-clients'), $location['province'] ?? '', array(
+                'required' => true,
+                'col_class' => 'col-md-3',
+                'options' => $provinceOptions,
+                'error' => $errors['province'] ?? '',
+            ));
+
             echo ViewHelpers::renderField('text', 'postal_code', __('Postal Code', 'wecoza-clients'), $location['postal_code'] ?? '', array(
                 'required' => true,
-                'col_class' => 'col-md-4',
+                'col_class' => 'col-md-3',
                 'error' => $errors['postal_code'] ?? '',
             ));
 
             echo ViewHelpers::renderField('text', 'latitude', __('Latitude', 'wecoza-clients'), $location['latitude'] ?? '', array(
                 'required' => true,
-                'col_class' => 'col-md-4',
+                'col_class' => 'col-md-3',
                 'error' => $errors['latitude'] ?? '',
                 'help_text' => __('e.g. -26.2041', 'wecoza-clients'),
                 'pattern' => '^-?\\d+\\.?\\d*$',
@@ -100,7 +107,7 @@ foreach ($provinces as $province) {
 
             echo ViewHelpers::renderField('text', 'longitude', __('Longitude', 'wecoza-clients'), $location['longitude'] ?? '', array(
                 'required' => true,
-                'col_class' => 'col-md-4',
+                'col_class' => 'col-md-3',
                 'error' => $errors['longitude'] ?? '',
                 'help_text' => __('e.g. 28.0473', 'wecoza-clients'),
                 'pattern' => '^-?\\d+\\.?\\d*$',
@@ -109,21 +116,21 @@ foreach ($provinces as $province) {
                 'max' => '180',
             ));
             ?>
-        </div>
-
-        <div class="mt-4 d-flex justify-content-between align-items-center">
-            <button type="button" id="check_duplicate_btn" class="btn btn-outline-secondary btn-sm">
-                <i class="fas fa-search me-1"></i> Check Duplicates
-            </button>
-            <div>
-                <button type="reset" class="btn btn-subtle-secondary btn-sm me-2">Reset Form</button>
-                <button type="submit" class="btn btn-subtle-primary">Save Location</button>
-            </div>
-        </div>
-        
+        </div>        
         <div id="duplicate_check_results" class="mt-3 d-none">
             <!-- Duplicate check results will be displayed here -->
         </div>
+
+        <div class="mt-4 d-flex align-items-center">
+            <button type="button" id="check_duplicate_btn" class="btn btn-subtle-info btn-sm me-2">
+                <i class="fas fa-search me-1"></i> Check Duplicates
+            </button>
+            <div>
+                <button type="reset" id="reset_location_form" class="btn btn-subtle-warning btn-sm me-2">Reset Form</button>
+                <button type="submit" id="submit_location_btn" class="btn btn-subtle-primary d-none">Save Location</button>
+            </div>
+        </div>
+
     </form>
 </div>
 
@@ -190,14 +197,18 @@ document.addEventListener('DOMContentLoaded', function() {
     // Duplicate check functionality
     var checkDuplicateBtn = document.getElementById('check_duplicate_btn');
     var duplicateResults = document.getElementById('duplicate_check_results');
+    var submitBtn = document.getElementById('submit_location_btn');
+    var resetBtn = document.getElementById('reset_location_form');
     
     if (checkDuplicateBtn) {
         checkDuplicateBtn.addEventListener('click', function() {
+            var streetAddress = document.getElementById('street_address').value.trim();
             var suburb = document.getElementById('suburb').value.trim();
             var town = document.getElementById('town').value.trim();
             
-            if (!suburb && !town) {
-                showDuplicateAlert('Please enter at least a suburb or town to check for duplicates.', 'warning');
+            if (!streetAddress && !suburb && !town) {
+                showDuplicateAlert('Please enter a street address, suburb, or town to check for duplicates.', 'warning');
+                hideSubmit();
                 return;
             }
             
@@ -209,6 +220,7 @@ document.addEventListener('DOMContentLoaded', function() {
             var formData = new FormData();
             formData.append('action', 'check_location_duplicates');
             formData.append('nonce', document.querySelector('#wecoza_locations_form_nonce').value);
+            formData.append('street_address', streetAddress);
             formData.append('suburb', suburb);
             formData.append('town', town);
             
@@ -216,15 +228,34 @@ document.addEventListener('DOMContentLoaded', function() {
                 method: 'POST',
                 body: formData
             }).then(function(response) {
-                return response.json();
-            }).then(function(response) {
-                if (response.success && response.data.duplicates.length > 0) {
-                    showDuplicateResults(response.data.duplicates);
+                return response.json().then(function(json) {
+                    return {
+                        ok: response.ok,
+                        payload: json
+                    };
+                });
+            }).then(function(result) {
+                var payload = result.payload || {};
+
+                if (!result.ok || !payload.success) {
+                    var message = payload.data && payload.data.message ? payload.data.message : 'Error checking duplicates.';
+                    showDuplicateAlert(message, 'danger');
+                    hideSubmit();
+                    return;
+                }
+
+                var duplicates = Array.isArray(payload.data && payload.data.duplicates) ? payload.data.duplicates : [];
+
+                if (duplicates.length > 0) {
+                    showDuplicateResults(duplicates);
                 } else {
                     showDuplicateAlert('No duplicate locations found.', 'success');
                 }
+
+                showSubmit();
             }).catch(function(error) {
                 showDuplicateAlert('Error checking duplicates: ' + error.message, 'danger');
+                hideSubmit();
             }).finally(function() {
                 // Reset button state
                 checkDuplicateBtn.disabled = false;
@@ -233,20 +264,69 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    function hideSubmit() {
+        if (submitBtn && !submitBtn.classList.contains('d-none')) {
+            submitBtn.classList.add('d-none');
+        }
+    }
+
+    function showSubmit() {
+        if (submitBtn && submitBtn.classList.contains('d-none')) {
+            submitBtn.classList.remove('d-none');
+        }
+    }
+
+    function handleInputChange() {
+        hideSubmit();
+        clearDuplicateResults();
+    }
+
+    ['street_address', 'suburb', 'town', 'province', 'postal_code', 'latitude', 'longitude'].forEach(function(id) {
+        var field = document.getElementById(id);
+        if (field) {
+            field.addEventListener('input', handleInputChange);
+            field.addEventListener('change', handleInputChange);
+        }
+    });
+
+    if (resetBtn) {
+        resetBtn.addEventListener('click', function() {
+            hideSubmit();
+            clearDuplicateResults();
+        });
+    }
+
+    function clearDuplicateResults() {
+        if (!duplicateResults) {
+            return;
+        }
+
+        duplicateResults.classList.add('d-none');
+        duplicateResults.innerHTML = '';
+        duplicateResults.removeAttribute('data-duplicate-state');
+    }
+
     function showDuplicateResults(duplicates) {
         var html = '<div class="alert alert-subtle-warning"><strong>Possible duplicates found:</strong><ul class="mb-0 mt-2">';
         duplicates.forEach(function(loc) {
-            html += '<li>' + loc.suburb + ', ' + loc.town + ' (' + loc.province + ')</li>';
+            var locationText = '';
+            if (loc.street_address) {
+                locationText = loc.street_address + ', ';
+            }
+            locationText += loc.suburb + ', ' + loc.town + ' (' + loc.province + ')';
+            html += '<li>' + locationText + '</li>';
         });
         html += '</ul></div>';
         duplicateResults.innerHTML = html;
         duplicateResults.classList.remove('d-none');
+        duplicateResults.setAttribute('data-duplicate-state', 'results');
     }
     
     function showDuplicateAlert(message, type) {
         var html = '<div class="alert alert-subtle-' + type + '">' + message + '</div>';
         duplicateResults.innerHTML = html;
         duplicateResults.classList.remove('d-none');
+        duplicateResults.setAttribute('data-duplicate-state', type);
     }
 });
 </script>

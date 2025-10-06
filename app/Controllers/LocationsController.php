@@ -98,6 +98,7 @@ class LocationsController {
         $errors = array();
         $success = false;
         $location = array(
+            'street_address' => '',
             'suburb' => '',
             'town' => '',
             'province' => '',
@@ -114,6 +115,7 @@ class LocationsController {
                 if ($result['success']) {
                     $success = true;
                     $location = array(
+                        'street_address' => '',
                         'suburb' => '',
                         'town' => '',
                         'province' => '',
@@ -168,6 +170,7 @@ class LocationsController {
 
     protected function sanitizeFormData($data) {
         return array(
+            'street_address' => isset($data['street_address']) ? sanitize_text_field($data['street_address']) : '',
             'suburb' => isset($data['suburb']) ? sanitize_text_field($data['suburb']) : '',
             'town' => isset($data['town']) ? sanitize_text_field($data['town']) : '',
             'province' => isset($data['province']) ? sanitize_text_field($data['province']) : '',
@@ -178,40 +181,38 @@ class LocationsController {
     }
 
     public function ajaxCheckLocationDuplicates() {
-        // Verify nonce
-        if (!wp_verify_nonce($_POST['nonce'], 'wecoza_locations_form')) {
-            wp_die(json_encode(array(
-                'success' => false,
-                'data' => 'Security check failed'
-            )));
+        $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
+
+        if (!wp_verify_nonce($nonce, 'submit_locations_form')) {
+            wp_send_json_error(
+                array('message' => __('Security check failed. Please reload the page and try again.', 'wecoza-clients')),
+                403
+            );
         }
 
-        // Check capabilities
         if (!current_user_can('view_wecoza_clients')) {
-            wp_die(json_encode(array(
-                'success' => false,
-                'data' => 'Insufficient permissions'
-            )));
+            wp_send_json_error(
+                array('message' => __('You do not have permission to perform this action.', 'wecoza-clients')),
+                403
+            );
         }
 
-        $suburb = isset($_POST['suburb']) ? sanitize_text_field($_POST['suburb']) : '';
-        $town = isset($_POST['town']) ? sanitize_text_field($_POST['town']) : '';
+        $streetAddress = isset($_POST['street_address']) ? sanitize_text_field(wp_unslash($_POST['street_address'])) : '';
+        $suburb = isset($_POST['suburb']) ? sanitize_text_field(wp_unslash($_POST['suburb'])) : '';
+        $town = isset($_POST['town']) ? sanitize_text_field(wp_unslash($_POST['town'])) : '';
 
-        if (empty($suburb) && empty($town)) {
-            wp_die(json_encode(array(
-                'success' => false,
-                'data' => 'Please provide suburb or town for duplicate check'
-            )));
+        if ($streetAddress === '' && $suburb === '' && $town === '') {
+            wp_send_json_error(
+                array('message' => __('Please provide a street address, suburb, or town before checking for duplicates.', 'wecoza-clients')),
+                400
+            );
         }
 
-        $duplicates = $this->getModel()->checkDuplicates($suburb, $town);
+        $duplicates = $this->getModel()->checkDuplicates($streetAddress, $suburb, $town);
 
-        wp_die(json_encode(array(
-            'success' => true,
-            'data' => array(
-                'duplicates' => $duplicates
-            )
-        )));
+        wp_send_json_success(
+            array('duplicates' => $duplicates)
+        );
     }
 
     protected function getGoogleMapsApiKey() {

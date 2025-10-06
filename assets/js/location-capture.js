@@ -10,6 +10,7 @@
         }
 
         var provinceSelect = form.find('#province');
+        var streetAddressInput = form.find('#street_address');
         var suburbInput = form.find('#suburb');
         var townInput = form.find('#town');
         var postalInput = form.find('#postal_code');
@@ -140,15 +141,27 @@
 
         function populateFromPlace(components, location) {
             var data = {
+                streetAddress: '',
                 suburb: '',
                 town: '',
                 province: '',
                 postalCode: ''
             };
 
+            var streetNumber = '';
+            var route = '';
+
             components.forEach(function (component) {
                 if (!component || !component.types) {
                     return;
+                }
+
+                if (component.types.indexOf('street_number') !== -1) {
+                    streetNumber = component.longText || component.long_name || '';
+                }
+
+                if (component.types.indexOf('route') !== -1) {
+                    route = component.longText || component.long_name || '';
                 }
 
                 if (component.types.indexOf('sublocality_level_1') !== -1 || component.types.indexOf('sublocality') !== -1 || component.types.indexOf('neighborhood') !== -1) {
@@ -167,6 +180,17 @@
                     data.postalCode = component.longText || component.long_name || data.postalCode;
                 }
             });
+
+            // Combine street number and route for street address
+            if (streetNumber && route) {
+                data.streetAddress = streetNumber + ' ' + route;
+            } else if (route) {
+                data.streetAddress = route;
+            }
+
+            if (data.streetAddress && streetAddressInput.length) {
+                streetAddressInput.val(data.streetAddress).trigger('change');
+            }
 
             if (data.suburb && suburbInput.length) {
                 suburbInput.val(data.suburb).trigger('change');
