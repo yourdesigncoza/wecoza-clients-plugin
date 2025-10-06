@@ -239,6 +239,11 @@ return array(
             'required' => true,
             'date' => true,
         ),
+        'main_client_id' => array(
+            'required' => false,
+            'integer' => true,
+            'min' => 0,
+        ),
     ),
 
     /**

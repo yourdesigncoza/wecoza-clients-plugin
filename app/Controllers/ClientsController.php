@@ -77,6 +77,7 @@ class ClientsController {
         add_action('wp_ajax_wecoza_get_branch_clients', array($this, 'ajaxGetBranchClients'));
         add_action('wp_ajax_wecoza_export_clients', array($this, 'ajaxExportClients'));
         add_action('wp_ajax_wecoza_get_locations', array($this, 'ajaxGetLocations'));
+        add_action('wp_ajax_wecoza_get_main_clients', array($this, 'ajaxGetMainClients'));
         
         // Non-logged in users (if needed)
         add_action('wp_ajax_nopriv_wecoza_search_clients', array($this, 'ajaxSearchClients'));
@@ -309,6 +310,9 @@ class ClientsController {
             ),
         );
         
+        // Get main clients for sub-client dropdown
+        $main_clients = $this->getModel()->getMainClients();
+        
         // Load view
         return \WeCozaClients\view('components/client-capture-form', array(
             'client' => $client,
@@ -318,6 +322,7 @@ class ClientsController {
             'status_options' => $status_options,
             'location_data' => $locationData,
             'sites' => $sitesData,
+            'main_clients' => $main_clients,
         ));
     }
     
@@ -545,6 +550,17 @@ class ClientsController {
         $client['client_status'] = isset($data['client_status']) ? sanitize_text_field($data['client_status']) : '';
         $client['financial_year_end'] = isset($data['financial_year_end']) ? sanitize_text_field($data['financial_year_end']) : '';
         $client['bbbee_verification_date'] = isset($data['bbbee_verification_date']) ? sanitize_text_field($data['bbbee_verification_date']) : '';
+        
+        // Handle sub-client relationship
+        $isSubClient = isset($data['is_sub_client']) && $data['is_sub_client'] === 'on';
+        if ($isSubClient && !empty($data['main_client_id'])) {
+            $client['main_client_id'] = (int) $data['main_client_id'];
+            if ($client['main_client_id'] <= 0) {
+                $client['main_client_id'] = null;
+            }
+        } else {
+            $client['main_client_id'] = null;
+        }
 
         $client['contact_person'] = isset($data['contact_person']) ? sanitize_text_field($data['contact_person']) : '';
         $client['contact_person_email'] = isset($data['contact_person_email']) ? sanitize_email($data['contact_person_email']) : '';
@@ -818,5 +834,24 @@ class ClientsController {
         
         fclose($output);
         exit;
+    }
+    
+    /**
+     * AJAX: Get main clients for sub-client dropdown
+     */
+    public function ajaxGetMainClients() {
+        // Verify nonce
+        if (!check_ajax_referer('wecoza_clients_ajax', 'nonce', false)) {
+            wp_die(json_encode(array('success' => false, 'message' => 'Security check failed.')));
+        }
+        
+        // Check permissions
+        if (!current_user_can('view_wecoza_clients')) {
+            wp_die(json_encode(array('success' => false, 'message' => 'Permission denied.')));
+        }
+        
+        $main_clients = $this->getModel()->getMainClients();
+        
+        wp_die(json_encode(array('success' => true, 'data' => $main_clients)));
     }
 }

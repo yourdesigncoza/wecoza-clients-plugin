@@ -20,6 +20,7 @@ class ClientsModel {
         'client_status' => ['client_status'],
         'financial_year_end' => ['financial_year_end'],
         'bbbee_verification_date' => ['bbbee_verification_date'],
+        'main_client_id' => ['main_client_id'],
         'created_at' => ['created_at'],
         'updated_at' => ['updated_at'],
     ];
@@ -35,6 +36,7 @@ class ClientsModel {
         'client_status',
         'financial_year_end',
         'bbbee_verification_date',
+        'main_client_id',
         'created_at',
         'updated_at',
     ];
@@ -535,6 +537,25 @@ class ClientsModel {
             }
         }
 
+        // Validate main_client_id specifically
+        if (!empty($data['main_client_id'])) {
+            $mainClientId = (int) $data['main_client_id'];
+            
+            if ($mainClientId <= 0) {
+                $errors['main_client_id'] = __('Invalid main client selected.', 'wecoza-clients');
+            } elseif ($id && $mainClientId === (int) $id) {
+                $errors['main_client_id'] = __('A client cannot be its own parent.', 'wecoza-clients');
+            } else {
+                // Check if the selected main client exists and is actually a main client
+                $mainClient = $this->getById($mainClientId);
+                if (!$mainClient) {
+                    $errors['main_client_id'] = __('Selected main client does not exist.', 'wecoza-clients');
+                } elseif (!empty($mainClient['main_client_id'])) {
+                    $errors['main_client_id'] = __('Selected client is already a sub-client. Please select a main client.', 'wecoza-clients');
+                }
+            }
+        }
+
         return $errors;
     }
 
@@ -565,5 +586,139 @@ class ClientsModel {
                 $data[$field] = is_array($decoded) ? $decoded : [];
             }
         }
+    }
+
+    /**
+     * Get only main clients (clients without a main_client_id)
+     */
+    public function getMainClients() {
+        $alias = 'c';
+        $primaryKey = $this->resolvedPrimaryKey;
+        $nameColumn = $this->getColumn('client_name', $primaryKey);
+        $registrationColumn = $this->getColumn('company_registration_nr');
+
+        $select = [
+            "{$alias}.{$primaryKey} AS id",
+            "{$alias}.{$nameColumn} AS client_name",
+        ];
+
+        if ($registrationColumn) {
+            $select[] = "{$alias}.{$registrationColumn} AS company_registration_nr";
+        }
+
+        $sql = 'SELECT ' . implode(', ', $select) . " 
+                FROM {$this->table} {$alias} 
+                WHERE {$alias}.main_client_id IS NULL 
+                ORDER BY {$alias}.{$nameColumn}";
+        
+        $rows = DatabaseService::getAll($sql) ?: [];
+
+        foreach ($rows as &$row) {
+            $row = $this->normalizeRow($row);
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    /**
+     * Get sub-clients of a specific main client
+     */
+    public function getSubClients($mainClientId) {
+        $mainClientId = (int) $mainClientId;
+        if ($mainClientId <= 0) {
+            return [];
+        }
+
+        $alias = 'c';
+        $primaryKey = $this->resolvedPrimaryKey;
+        $nameColumn = $this->getColumn('client_name', $primaryKey);
+        $registrationColumn = $this->getColumn('company_registration_nr');
+
+        $select = [
+            "{$alias}.{$primaryKey} AS id",
+            "{$alias}.{$nameColumn} AS client_name",
+        ];
+
+        if ($registrationColumn) {
+            $select[] = "{$alias}.{$registrationColumn} AS company_registration_nr";
+        }
+
+        $sql = 'SELECT ' . implode(', ', $select) . " 
+                FROM {$this->table} {$alias} 
+                WHERE {$alias}.main_client_id = :main_client_id 
+                ORDER BY {$alias}.{$nameColumn}";
+        
+        $rows = DatabaseService::getAll($sql, [':main_client_id' => $mainClientId]) ?: [];
+
+        foreach ($rows as &$row) {
+            $row = $this->normalizeRow($row);
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    /**
+     * Get all clients with their sub-client relationship information
+     */
+    public function getAllWithHierarchy() {
+        $alias = 'c';
+        $primaryKey = $this->resolvedPrimaryKey;
+        $nameColumn = $this->getColumn('client_name', $primaryKey);
+        $registrationColumn = $this->getColumn('company_registration_nr');
+        $mainClientColumn = $this->getColumn('main_client_id');
+
+        $select = [
+            "{$alias}.{$primaryKey} AS id",
+            "{$alias}.{$nameColumn} AS client_name",
+        ];
+
+        if ($registrationColumn) {
+            $select[] = "{$alias}.{$registrationColumn} AS company_registration_nr";
+        }
+
+        if ($mainClientColumn) {
+            $select[] = "{$alias}.{$mainClientColumn} AS main_client_id";
+        }
+
+        $sql = 'SELECT ' . implode(', ', $select) . " 
+                FROM {$this->table} {$alias} 
+                ORDER BY {$alias}.main_client_id NULLS FIRST, {$alias}.{$nameColumn}";
+        
+        $rows = DatabaseService::getAll($sql) ?: [];
+
+        foreach ($rows as &$row) {
+            $row = $this->normalizeRow($row);
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    /**
+     * Update client hierarchy (change a client from main to sub-client or vice versa)
+     */
+    public function updateClientHierarchy($clientId, $mainClientId = null) {
+        $clientId = (int) $clientId;
+        if ($clientId <= 0) {
+            return false;
+        }
+
+        $data = [];
+        if ($mainClientId === null) {
+            $data['main_client_id'] = null; // Make it a main client
+        } else {
+            $mainClientId = (int) $mainClientId;
+            if ($mainClientId <= 0 || $mainClientId === $clientId) {
+                return false;
+            }
+            $data['main_client_id'] = $mainClientId;
+        }
+
+        $where = $this->resolvedPrimaryKey . ' = :id';
+        $params = [':id' => $clientId];
+        
+        return DatabaseService::update($this->table, $data, $where, $params);
     }
 }

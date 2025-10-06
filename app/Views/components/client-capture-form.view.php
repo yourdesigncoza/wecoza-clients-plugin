@@ -18,6 +18,12 @@ $location_data = $location_data ?? array();
 $location_selected = $location_data['selected'] ?? array();
 $location_hierarchy = $location_data['hierarchy'] ?? array();
 $sites = $sites ?? array('head' => null, 'sub_sites' => array());
+$main_clients = $main_clients ?? array();
+
+// Sub-client variables
+$is_sub_client = !empty($client['main_client_id']);
+$selected_main_client_id = $client['main_client_id'] ?? '';
+$is_sub_client_checked = $is_sub_client ? 'checked' : '';
 
 $headSite = $sites['head'] ?? null;
 
@@ -144,6 +150,44 @@ $is_edit = !empty($client['id']);
                     'required' => true,
                     'col_class' => 'col-md-4',
                     'error' => $errors['company_registration_nr'] ?? ''
+                )
+            );
+            ?>
+        </div>
+        
+        <!-- Sub-Client Information -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="form-check mb-3">
+                    <input type="checkbox" class="form-check-input" id="is_sub_client" name="is_sub_client" <?php echo $is_sub_client_checked; ?>>
+                    <label class="form-check-label" for="is_sub_client">
+                        <strong>Is SubClient</strong><br>
+                        <small class="text-muted">Check if this client is a branch/subsidiary of another main client</small>
+                    </label>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-2" id="main_client_dropdown_container" style="<?php echo $is_sub_client ? '' : 'display: none;'; ?>">
+            <?php
+            // Prepare main client options for select
+            $main_client_options = array('' => 'Select Main Client...');
+            foreach ($main_clients as $main_client) {
+                $label = $main_client['client_name'];
+                if (!empty($main_client['company_registration_nr'])) {
+                    $label .= ' (' . $main_client['company_registration_nr'] . ')';
+                }
+                $main_client_options[$main_client['id']] = $label;
+            }
+            
+            echo ViewHelpers::renderField('select', 'main_client_id', 'Main Client', 
+                $selected_main_client_id, 
+                array(
+                    'required' => true,
+                    'col_class' => 'col-md-6 js-main-client-field',
+                    'class' => 'js-main-client-select',
+                    'options' => $main_client_options,
+                    'error' => $errors['main_client_id'] ?? ''
                 )
             );
             ?>
@@ -364,5 +408,38 @@ document.addEventListener('DOMContentLoaded', function() {
         
         form.classList.add('was-validated');
     }, false);
+
+    // Sub-client checkbox functionality
+    var isSubClientCheckbox = document.getElementById('is_sub_client');
+    var mainClientDropdownContainer = document.getElementById('main_client_dropdown_container');
+    var mainClientSelect = document.querySelector('.js-main-client-select');
+    
+    if (isSubClientCheckbox && mainClientDropdownContainer) {
+        isSubClientCheckbox.addEventListener('change', function() {
+            var isChecked = this.checked;
+            mainClientDropdownContainer.style.display = isChecked ? 'block' : 'none';
+            
+            // Handle required attribute
+            if (mainClientSelect) {
+                if (isChecked) {
+                    mainClientSelect.setAttribute('required', 'required');
+                } else {
+                    mainClientSelect.removeAttribute('required');
+                    mainClientSelect.value = '';
+                }
+            }
+        });
+        
+        // Initialize state
+        var initiallyChecked = isSubClientCheckbox.checked;
+        mainClientDropdownContainer.style.display = initiallyChecked ? 'block' : 'none';
+        if (mainClientSelect) {
+            if (initiallyChecked) {
+                mainClientSelect.setAttribute('required', 'required');
+            } else {
+                mainClientSelect.removeAttribute('required');
+            }
+        }
+    }
 });
 </script>

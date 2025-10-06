@@ -2211,6 +2211,7 @@ CREATE TABLE public.clients (
     client_status character varying(50),
     financial_year_end date,
     bbbee_verification_date date,
+    main_client_id integer,
     created_at timestamp without time zone DEFAULT now(),
     updated_at timestamp without time zone DEFAULT now()
 );
@@ -2306,6 +2307,15 @@ COMMENT ON COLUMN public.clients.created_at IS 'Timestamp when the client record
 --
 
 COMMENT ON COLUMN public.clients.updated_at IS 'Timestamp when the client record was last updated';
+
+
+--
+-- TOC entry 5202 (class 0 OID 0)
+-- Dependencies: 228
+-- Name: COLUMN clients.main_client_id; Type: COMMENT; Schema: public; Owner: doadmin
+--
+
+COMMENT ON COLUMN public.clients.main_client_id IS 'Reference to the main client for sub-client relationships (NULL for main clients)';
 
 
 --
@@ -5560,6 +5570,23 @@ ALTER TABLE ONLY public.client_contact_persons
 
 ALTER TABLE ONLY public.clients
     ADD CONSTRAINT clients_pkey PRIMARY KEY (client_id);
+
+
+--
+-- TOC entry 4628 (class 1259 OID 17875)
+-- Name: ix_clients_main_client_id; Type: INDEX; Schema: public; Owner: doadmin
+--
+
+CREATE INDEX ix_clients_main_client_id ON public.clients USING btree (main_client_id);
+
+
+--
+-- TOC entry 4629 (class 2606 OID 17876)
+-- Name: clients_main_client_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: doadmin
+--
+
+ALTER TABLE ONLY public.clients
+    ADD CONSTRAINT clients_main_client_id_fkey FOREIGN KEY (main_client_id) REFERENCES public.clients(client_id) ON UPDATE CASCADE ON DELETE SET NULL;
 
 
 --
