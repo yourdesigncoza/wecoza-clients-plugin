@@ -194,10 +194,6 @@ return array(
             'required' => true,
             'max_length' => 50,
         ),
-        'client_street_address' => array(
-            'required' => true,
-            'max_length' => 500,
-        ),
         'client_province' => array(
             'required' => true,
             'max_length' => 50,
@@ -219,10 +215,7 @@ return array(
             'required' => true,
             'max_length' => 255,
         ),
-        'client_communication' => array(
-            'required' => true,
-            'in' => array('Cold Call', 'Lead', 'Active Client', 'Lost Client'),
-        ),
+        
         'seta' => array(
             'required' => true,
             'max_length' => 50,

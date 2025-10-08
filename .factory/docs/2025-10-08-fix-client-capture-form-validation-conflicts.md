@@ -1,0 +1,5 @@
+## Proposed Fix Plan
+1. **Remove site-specific rules from `config/app.php`:** Delete the `site_name` and `client_street_address` entries from the global `validation_rules`, so the client validator stops failing when those values are only present in the site payload.
+2. **Align controller error mapping:** Update `ClientsController::handleFormSubmission()` to map `SitesModel::validateHeadSite()` errors to the field keys the form expects (`site_name`, `site_address_line_1`, `client_town_id`, etc.), ensuring any future site validation errors display correctly.
+3. **Retest submission flow:** Submit the `[wecoza_capture_clients]` form to confirm the request now succeeds and no validation errors appear when fields are populated.
+4. **Remove temporary debugging instrumentation:** Once verified, strip the PHP and JavaScript debug logging that was added during investigation, and run the plugin’s standard checks (or smoke-test the shortcode) to confirm everything remains stable.

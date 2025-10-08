@@ -84,7 +84,7 @@ class SitesModel {
     }
 
     protected function fetchAllLocations() {
-        $sql = 'SELECT location_id, suburb, town, province, postal_code, longitude, latitude FROM public.locations ORDER BY province, town, suburb, location_id';
+        $sql = 'SELECT location_id, suburb, town, province, postal_code, longitude, latitude, street_address FROM public.locations ORDER BY province, town, suburb, location_id';
         $rows = DatabaseService::getAll($sql) ?: array();
 
         return array_map(function ($row) {
@@ -96,6 +96,7 @@ class SitesModel {
                 'postal_code' => isset($row['postal_code']) ? trim((string) $row['postal_code']) : '',
                 'longitude' => isset($row['longitude']) ? (float) $row['longitude'] : null,
                 'latitude' => isset($row['latitude']) ? (float) $row['latitude'] : null,
+                'street_address' => isset($row['street_address']) ? trim((string) $row['street_address']) : '',
             );
         }, $rows);
     }
@@ -118,6 +119,7 @@ class SitesModel {
             $town = $row['town'];
             $province = $row['province'];
             $postal = $row['postal_code'];
+            $streetAddress = $row['street_address'];
 
             $map[$id] = array(
                 'id' => $id,
@@ -127,6 +129,7 @@ class SitesModel {
                 'postal_code' => $postal,
                 'longitude' => $row['longitude'],
                 'latitude' => $row['latitude'],
+                'street_address' => $streetAddress,
             );
 
             if ($province === '' || $town === '' || $suburb === '') {
@@ -161,6 +164,7 @@ class SitesModel {
                 'id' => $id,
                 'name' => $suburb,
                 'postal_code' => $postal,
+                'street_address' => $streetAddress,
             );
         }
 

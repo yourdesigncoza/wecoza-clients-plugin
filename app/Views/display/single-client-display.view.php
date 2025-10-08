@@ -81,12 +81,7 @@ $renderDataList = function ($items) use ($formatListValue) {
             </div>
 
             <div class="row g-3">
-                <div class="col-md-4">
-                    <div class="bg-light rounded-3 p-3 h-100">
-                        <p class="text-uppercase text-muted fs-10 mb-2"><?php esc_html_e('Communication Type', 'wecoza-clients'); ?></p>
-                        <p class="fw-semibold mb-0"><?php echo esc_html($client['client_communication'] ?? ''); ?></p>
-                    </div>
-                </div>
+                
                 <div class="col-md-4">
                     <div class="bg-light rounded-3 p-3 h-100">
                         <p class="text-uppercase text-muted fs-10 mb-2"><?php esc_html_e('SETA', 'wecoza-clients'); ?></p>

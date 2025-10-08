@@ -167,6 +167,7 @@ class ClientsController {
                 'export' => 'wecoza_export_clients',
                 'locations' => 'wecoza_get_locations',
             ),
+            'clear_form_on_success' => true,
             'messages' => array(
                 'form' => array(
                     'saving' => __('Saving client...', 'wecoza-clients'),
@@ -241,9 +242,9 @@ class ClientsController {
             }
         }
         
-        // Handle form submission
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wecoza_clients_form_nonce'])) {
-            if (!wp_verify_nonce($_POST['wecoza_clients_form_nonce'], 'submit_clients_form')) {
+        // Handle form submission (non-AJAX fallback)
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nonce']) && !wp_doing_ajax()) {
+            if (!check_ajax_referer('wecoza_clients_ajax', 'nonce', false)) {
                 $errors[] = __('Security check failed. Please try again.', 'wecoza-clients');
             } else {
                 $result = $this->handleFormSubmission($atts['id']);
@@ -439,7 +440,7 @@ class ClientsController {
         $clientData = $payload['client'];
         $siteData = $payload['site'];
         $contactData = $payload['contact'];
-        $communicationType = $payload['communication_type'];
+        $communicationType = $clientData['client_status'] ?? '';
         $isNew = ((int) $clientId) <= 0;
 
         $errors = $this->getModel()->validate($clientData, $clientId);
@@ -447,7 +448,25 @@ class ClientsController {
 
         if ($siteErrors) {
             foreach ($siteErrors as $field => $message) {
-                $errors['site_' . $field] = $message;
+                switch ($field) {
+                    case 'site_name':
+                        $errors['site_name'] = $message;
+                        break;
+                    case 'address_line_1':
+                        $errors['site_address_line_1'] = $message;
+                        $errors['client_street_address'] = $message;
+                        break;
+                    case 'address_line_2':
+                        $errors['site_address_line_2'] = $message;
+                        break;
+                    case 'place_id':
+                        $errors['client_town_id'] = $message;
+                        $errors['site_place_id'] = $message;
+                        break;
+                    default:
+                        $errors['site_' . $field] = $message;
+                        break;
+                }
             }
         }
 
@@ -567,7 +586,6 @@ class ClientsController {
         $client['contact_person_cellphone'] = isset($data['contact_person_cellphone']) ? sanitize_text_field($data['contact_person_cellphone']) : '';
         $client['contact_person_tel'] = isset($data['contact_person_tel']) ? sanitize_text_field($data['contact_person_tel']) : '';
         $client['contact_person_position'] = isset($data['contact_person_position']) ? sanitize_text_field($data['contact_person_position']) : '';
-        $client['client_communication'] = isset($data['client_communication']) ? sanitize_text_field($data['client_communication']) : '';
 
         $client['client_suburb'] = isset($data['client_suburb']) ? sanitize_text_field($data['client_suburb']) : '';
         $client['client_postal_code'] = isset($data['client_postal_code']) ? sanitize_text_field($data['client_postal_code']) : '';
@@ -576,23 +594,31 @@ class ClientsController {
 
         $placeId = isset($data['client_town_id']) ? (int) $data['client_town_id'] : 0;
         $client['client_town_id'] = $placeId;
-        if ($placeId > 0) {
-            $location = $this->getSitesModel()->getLocationById($placeId);
-            if ($location) {
-                $client['client_suburb'] = $location['suburb'] ?? $client['client_suburb'];
-                $client['client_postal_code'] = $location['postal_code'] ?? $client['client_postal_code'];
-                $client['client_province'] = $location['province'] ?? $client['client_province'];
-                $client['client_town'] = $location['town'] ?? $client['client_town'];
-            }
-        }
-
+        // Initialize site array with default values
         $site = array(
             'site_id' => isset($data['head_site_id']) ? (int) $data['head_site_id'] : 0,
-            'site_name' => isset($data['head_site_name']) ? sanitize_text_field($data['head_site_name']) : '',
+            'site_name' => isset($data['site_name']) ? sanitize_text_field($data['site_name']) : '',
             'address_line_1' => isset($data['client_street_address']) ? sanitize_text_field($data['client_street_address']) : '',
             'address_line_2' => isset($data['client_address_line_2']) ? sanitize_text_field($data['client_address_line_2']) : '',
             'place_id' => $placeId,
         );
+
+        if ($placeId > 0) {
+            $location = $this->getSitesModel()->getLocationById($placeId);
+            if ($location) {
+                // Override client data with location data
+                $client['client_suburb'] = $location['suburb'] ?? $client['client_suburb'];
+                $client['client_postal_code'] = $location['postal_code'] ?? $client['client_postal_code'];
+                $client['client_province'] = $location['province'] ?? $client['client_province'];
+                $client['client_town'] = $location['town'] ?? $client['client_town'];
+                
+                // Override site address with location street address
+                if (!empty($location['street_address'])) {
+                    $site['address_line_1'] = $location['street_address'];
+                    $site['address_line_2'] = ''; // Clear address line 2 since it's not in location data
+                }
+            }
+        }
 
         $contact = array(
             'name' => $client['contact_person'],
@@ -606,7 +632,6 @@ class ClientsController {
             'client' => $client,
             'site' => $site,
             'contact' => $contact,
-            'communication_type' => $client['client_communication'],
         );
     }
     
@@ -666,7 +691,7 @@ class ClientsController {
         
         // Handle form submission
         $result = $this->handleFormSubmission($clientId);
-        
+
         wp_die(json_encode($result));
     }
     

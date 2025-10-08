@@ -26,7 +26,8 @@ if (!defined('ABSPATH')) {
 
 // Define plugin constants
 // Keep asset versions stable so browsers can cache them properly
-define('WECOZA_CLIENTS_VERSION', '2.0.4');
+$ver = time();
+define('WECOZA_CLIENTS_VERSION', $ver);
 define('WECOZA_CLIENTS_PLUGIN_FILE', __FILE__);
 define('WECOZA_CLIENTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WECOZA_CLIENTS_PLUGIN_URL', plugin_dir_url(__FILE__));

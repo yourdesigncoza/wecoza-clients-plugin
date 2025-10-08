@@ -116,7 +116,7 @@ $is_edit = !empty($client['id']);
     <?php endif; ?>
     
     <form id="clients-form" class="needs-validation ydcoza-compact-form" novalidate method="POST" enctype="multipart/form-data">
-        <?php wp_nonce_field('submit_clients_form', 'wecoza_clients_form_nonce'); ?>
+        
         
         <?php if ($is_edit) : ?>
             <input type="hidden" name="id" value="<?php echo esc_attr($client['id']); ?>">
@@ -135,12 +135,12 @@ $is_edit = !empty($client['id']);
                 )
             );
             
-            echo ViewHelpers::renderField('text', 'head_site_name', 'Head Site Name', 
+            echo ViewHelpers::renderField('text', 'site_name', 'Site Name', 
                 $headSiteName, 
                 array(
                     'required' => true,
                     'col_class' => 'col-md-4',
-                    'error' => $errors['site_site_name'] ?? ''
+                    'error' => $errors['site_name'] ?? ''
                 )
             );
             
@@ -157,7 +157,7 @@ $is_edit = !empty($client['id']);
         
         <!-- Sub-Client Information -->
         <div class="row mt-4">
-            <div class="col-12">
+            <div class="col-4">
                 <div class="form-check mb-3">
                     <input type="checkbox" class="form-check-input" id="is_sub_client" name="is_sub_client" <?php echo $is_sub_client_checked; ?>>
                     <label class="form-check-label" for="is_sub_client">
@@ -166,37 +166,41 @@ $is_edit = !empty($client['id']);
                     </label>
                 </div>
             </div>
+            <div class="col-6">
+                <div id="main_client_dropdown_container" style="<?php echo $is_sub_client ? '' : 'display: none;'; ?>">
+                    <?php
+                    // Prepare main client options for select
+                    $main_client_options = array('' => 'Select Main Client...');
+                    foreach ($main_clients as $main_client) {
+                        $label = $main_client['client_name'];
+                        if (!empty($main_client['company_registration_nr'])) {
+                            $label .= ' (' . $main_client['company_registration_nr'] . ')';
+                        }
+                        $main_client_options[$main_client['id']] = $label;
+                    }
+                    
+                    echo ViewHelpers::renderField('select', 'main_client_id', 'Main Client', 
+                        $selected_main_client_id, 
+                        array(
+                            'required' => true,
+                            'col_class' => 'col-md-6 js-main-client-field',
+                            'class' => 'js-main-client-select',
+                            'options' => $main_client_options,
+                            'error' => $errors['main_client_id'] ?? ''
+                        )
+                    );
+                    ?>
+                </div>
+            </div>
         </div>
         
-        <div class="row mt-2" id="main_client_dropdown_container" style="<?php echo $is_sub_client ? '' : 'display: none;'; ?>">
-            <?php
-            // Prepare main client options for select
-            $main_client_options = array('' => 'Select Main Client...');
-            foreach ($main_clients as $main_client) {
-                $label = $main_client['client_name'];
-                if (!empty($main_client['company_registration_nr'])) {
-                    $label .= ' (' . $main_client['company_registration_nr'] . ')';
-                }
-                $main_client_options[$main_client['id']] = $label;
-            }
-            
-            echo ViewHelpers::renderField('select', 'main_client_id', 'Main Client', 
-                $selected_main_client_id, 
-                array(
-                    'required' => true,
-                    'col_class' => 'col-md-6 js-main-client-field',
-                    'class' => 'js-main-client-select',
-                    'options' => $main_client_options,
-                    'error' => $errors['main_client_id'] ?? ''
-                )
-            );
-            ?>
-        </div>
-        
+
         <div class="border-top border-opacity-25 border-3 border-discovery my-5 mx-1"></div>
         
         <!-- Address Information -->
         <div class="row">
+            <p class="text-muted">The correct address should already be registered in the Locations table. If not, please add it there first.</p>
+
             <?php
             echo ViewHelpers::renderField('select', 'client_province', 'Province', 
                 $selected_province, 
@@ -252,7 +256,9 @@ $is_edit = !empty($client['id']);
                 $headSiteAddress1, 
                 array(
                     'required' => true,
-                    'col_class' => 'col-md-6 js-address-field' . ($has_location ? '' : ' d-none'),
+                    'readonly' => $has_location,
+                    'title' => $has_location ? 'Address auto-populated from location data' : '',
+                    'col_class' => 'col-md-6 js-address-field js-street-address-field' . ($has_location ? '' : ' d-none'),
                     'error' => $errors['site_address_line_1'] ?? ($errors['client_street_address'] ?? '')
                 )
             );
@@ -260,6 +266,8 @@ $is_edit = !empty($client['id']);
             echo ViewHelpers::renderField('text', 'client_address_line_2', 'Address Line 2', 
                 $headSiteAddress2, 
                 array(
+                    'readonly' => $has_location,
+                    'title' => $has_location ? 'Address line 2 is managed by location system' : '',
                     'col_class' => 'col-md-6 js-address-2-field' . ($has_location ? '' : ' d-none'),
                     'error' => $errors['site_address_line_2'] ?? ''
                 )
@@ -312,25 +320,7 @@ $is_edit = !empty($client['id']);
         <div class="border-top border-opacity-25 border-3 border-discovery my-5 mx-1"></div>
         
         <!-- Business Information -->
-        <div class="row">
-            <?php
-            // Prepare status options for select
-            $comm_options = array();
-            foreach ($status_options as $key => $value) {
-                $comm_options[$key] = $value;
-            }
-            
-            echo ViewHelpers::renderField('select', 'client_communication', 'Client Communication', 
-                $client['client_communication'] ?? '', 
-                array(
-                    'required' => true,
-                    'col_class' => 'col-md-6',
-                    'options' => $comm_options,
-                    'error' => $errors['client_communication'] ?? ''
-                )
-            );
-            ?>
-        </div>
+        
         
         <div class="row mt-3">
             <?php

@@ -231,7 +231,6 @@ class ClientsModel {
             }
 
             if (isset($communications[$clientId])) {
-                $row['client_communication'] = $communications[$clientId]['communication_type'];
                 $row['last_communication_at'] = $communications[$clientId]['communication_date'];
             }
         }

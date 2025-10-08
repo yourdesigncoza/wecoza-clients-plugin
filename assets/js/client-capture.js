@@ -52,6 +52,42 @@
             }
         };
 
+        var clearForm = function () {
+            // Clear all form fields
+            form[0].reset();
+            
+            // Clear hidden fields
+            form.find('input[name="id"]').val('');
+            form.find('input[name="head_site_id"]').val('');
+            
+            // Reset Bootstrap validation state
+            form.removeClass('was-validated');
+            
+            // Reset location dropdowns to initial state
+            initializeLocations();
+            
+            // Clear any custom field values
+            form.find('input[type="text"], input[type="email"], input[type="tel"], textarea').each(function () {
+                if ($(this).attr('name') !== 'client_town_id') {
+                    $(this).val('');
+                }
+            });
+            
+            // Reset select elements to first option
+            form.find('select').each(function () {
+                $(this).prop('selectedIndex', 0);
+            });
+            
+            // Hide conditional fields that might be shown
+            hideTownWrapper();
+            hideSuburbWrapper();
+            hideAddressWrapper(false);
+            hidePostalWrapper(true);
+            
+            // Clear hidden location fields
+            clearHiddenLocation();
+        };
+
         var extractErrors = function (errors) {
             if (!errors) {
                 return config.messages.form.error;
@@ -232,15 +268,21 @@
 
             var suburbs = suburbsMap[province + '||' + town] || [];
             $.each(suburbs, function (_, suburb) {
+                var displayText = suburb.name || '';
+                if (suburb.street_address) {
+                    displayText += ' - ' + suburb.street_address;
+                }
+
                 var option = $('<option>', {
                     value: suburb.id,
-                    text: suburb.name || ''
+                    text: displayText
                 });
 
                 option.data('postal_code', suburb.postal_code || '');
                 option.data('suburb', suburb.name || '');
                 option.data('town', town || '');
                 option.data('province', province || '');
+                option.data('street_address', suburb.street_address || '');
 
                 suburbSelect.append(option);
             });
@@ -283,10 +325,14 @@
             toggleRequired(addressInput, false);
             if (clearValue && addressInput.length) {
                 addressInput.val('');
+                addressInput.prop('readonly', false);
+                addressInput.removeAttr('title');
             }
             address2Wrapper.addClass('d-none');
             if (clearValue && address2Input.length) {
                 address2Input.val('');
+                address2Input.prop('readonly', false);
+                address2Input.removeAttr('title');
             }
         };
 
@@ -309,6 +355,7 @@
             }
 
             var locationId = suburbSelect.val();
+            
             if (!locationId) {
                 clearHiddenLocation();
                 hideAddressWrapper(true);
@@ -322,6 +369,7 @@
             var option = suburbSelect.find('option:selected');
             var suburbName = option.data('suburb') || option.text();
             var postalCode = option.data('postal_code') || '';
+            var streetAddress = option.data('street_address') || '';
             var townName = option.data('town') || (townSelect.val() || '');
 
             suburbHidden.val(suburbName);
@@ -330,10 +378,27 @@
                 postalInput.val(postalCode);
             }
 
+            // Auto-populate street address fields from location data
+            if (addressInput.length && streetAddress) {
+                addressInput.val(streetAddress);
+                addressInput.prop('readonly', true);
+                addressInput.attr('title', 'Address auto-populated from location data');
+            } else if (addressInput.length) {
+                addressInput.prop('readonly', false);
+                addressInput.removeAttr('title');
+            }
+            
+            // Clear and make address line 2 readonly since it's not in location data
+            if (address2Input.length) {
+                address2Input.val('');
+                address2Input.prop('readonly', true);
+                address2Input.attr('title', 'Address line 2 is managed by location system');
+            }
+
             showPostalWrapper();
             showAddressWrapper();
 
-            if (!isInitial && addressInput.length && !addressInput.val()) {
+            if (!isInitial && addressInput.length && !addressInput.val() && !streetAddress) {
                 addressInput.focus();
             }
         };
@@ -458,6 +523,7 @@
             form.addClass('was-validated');
 
             var formData = new FormData(form[0]);
+
             formData.append('action', config.actions.save);
             formData.append('nonce', config.nonce);
 
@@ -475,6 +541,8 @@
                     var message = response.message || config.messages.form.saved;
                     renderMessage('success', message);
 
+                    // Check if this was a new client and form should be cleared
+                    var isNewClient = !form.find('input[name="id"]').val();
                     if (response.client && response.client.id) {
                         var idInput = form.find('input[name="id"]');
                         if (!idInput.length) {
@@ -484,9 +552,20 @@
 
                         if (response.client.head_site && response.client.head_site.site_id) {
                             form.find('input[name="head_site_id"]').val(response.client.head_site.site_id);
-                            if (response.client.head_site.site_name && !form.find('input[name="head_site_name"]').val()) {
-                                form.find('input[name="head_site_name"]').val(response.client.head_site.site_name);
+                            if (response.client.head_site.site_name && !form.find('input[name="site_name"]').val()) {
+                                form.find('input[name="site_name"]').val(response.client.head_site.site_name);
                             }
+                        }
+
+                        // Clear form if it was a new client and configuration allows it
+                        if (isNewClient && config.clear_form_on_success) {
+                            setTimeout(function() {
+                                clearForm();
+                                // Clear success message after 3 seconds
+                                setTimeout(function() {
+                                    feedback.empty();
+                                }, 3000);
+                            }, 1500); // Give user time to see success message
                         }
                     }
 
@@ -496,7 +575,7 @@
                 } else {
                     renderMessage('error', config.messages.form.error);
                 }
-            }).fail(function () {
+            }).fail(function (xhr, status, error) {
                 renderMessage('error', config.messages.form.error);
             }).always(function () {
                 setSubmittingState(false);
