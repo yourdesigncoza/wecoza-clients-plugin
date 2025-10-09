@@ -125,16 +125,8 @@ class ClientsController {
         
         if ($has_display_table) {
             wp_enqueue_script(
-                'wecoza-clients-display',
-                \WeCozaClients\asset_url('js/clients-display.js'),
-                array('jquery'),
-                WECOZA_CLIENTS_VERSION,
-                true
-            );
-            
-            wp_enqueue_script(
-                'wecoza-client-search',
-                \WeCozaClients\asset_url('js/client-search.js'),
+                'wecoza-clients-table',
+                \WeCozaClients\asset_url('js/clients-table.js'),
                 array('jquery'),
                 WECOZA_CLIENTS_VERSION,
                 true
@@ -142,8 +134,7 @@ class ClientsController {
             
             // Localize script
             $localization = $this->getLocalizationPayload($nonce);
-            wp_localize_script('wecoza-clients-display', 'wecoza_clients', $localization);
-            wp_localize_script('wecoza-client-search', 'wecoza_clients', $localization);
+            wp_localize_script('wecoza-clients-table', 'wecozaClients', $localization);
         }
     }
 
