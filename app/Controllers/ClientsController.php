@@ -62,7 +62,6 @@ class ClientsController {
     protected function registerShortcodes() {
         add_shortcode('wecoza_capture_clients', array($this, 'captureClientShortcode'));
         add_shortcode('wecoza_display_clients', array($this, 'displayClientsShortcode'));
-        add_shortcode('wecoza_display_single_client', array($this, 'displaySingleClientShortcode'));
     }
     
     /**
@@ -98,7 +97,6 @@ class ClientsController {
         
         $has_capture_form = has_shortcode($post->post_content, 'wecoza_capture_clients');
         $has_display_table = has_shortcode($post->post_content, 'wecoza_display_clients');
-        $has_single_display = has_shortcode($post->post_content, 'wecoza_display_single_client');
         $nonce = wp_create_nonce('wecoza_clients_ajax');
         
         // Enqueue scripts based on shortcode presence
@@ -382,44 +380,7 @@ class ClientsController {
         ));
     }
     
-    /**
-     * Display single client shortcode
-     *
-     * @param array $atts Shortcode attributes
-     * @return string
-     */
-    public function displaySingleClientShortcode($atts) {
-        // Check permissions
-        if (!current_user_can('view_wecoza_clients')) {
-            return '<p>' . __('You do not have permission to view clients.', 'wecoza-clients') . '</p>';
-        }
-        
-        $atts = shortcode_atts(array(
-            'id' => 0,
-        ), $atts);
-        
-        // Get client ID from URL if not in attributes
-        if (!$atts['id'] && isset($_GET['client_id'])) {
-            $atts['id'] = intval($_GET['client_id']);
-        }
-        
-        if (!$atts['id']) {
-            return '<p>' . __('No client specified.', 'wecoza-clients') . '</p>';
-        }
-        
-        // Get client data
-        $client = $this->getModel()->getById($atts['id']);
-        if (!$client) {
-            return '<p>' . __('Client not found.', 'wecoza-clients') . '</p>';
-        }
-        
-        $sites = $this->getSitesModel()->getSitesByClient($client['id']);
 
-        return \WeCozaClients\view('display/single-client-display', array(
-            'client' => $client,
-            'sites' => $sites,
-        ));
-    }
     
     /**
      * Handle form submission

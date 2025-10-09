@@ -378,7 +378,7 @@ $is_edit = !empty($client['id']);
         
         <!-- Submit Button -->
         <div class="col-md-3">
-            <button type="submit" class="btn btn-primary mt-3">
+            <button type="submit" class="btn btn-subtle-primary mt-3">
                 <?php echo $is_edit ? 'Update Client' : 'Add New Client'; ?>
             </button>
         </div>

@@ -87,7 +87,7 @@ $editUrl = site_url('/client-management', is_ssl() ? 'https' : 'http');
                         <i class="bi bi-download ms-1"></i>
                     </button>
                     <?php endif; ?>
-                    <a href="<?php echo esc_url(site_url('/client-management', is_ssl() ? 'https' : 'http')); ?>" class="btn btn-primary btn-sm">
+                    <a href="<?php echo esc_url(site_url('/client-management', is_ssl() ? 'https' : 'http')); ?>" class="btn btn-outline-primary btn-sm">
                         <i class="bi bi-plus-circle me-1"></i>
                         Add New Client
                     </a>
@@ -661,7 +661,7 @@ function deleteClient(clientId, clientName) {
                                                     <div class="d-flex bg-warning-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
                                                         <i class="bi bi-calendar-event text-warning" style="font-size: 12px;"></i>
                                                     </div>
-                                                    <p class="fw-bold mb-0">Financial Year End :</p>
+                                                    <p class="fw-bold mb-0">Financial YE :</p>
                                                 </div>
                                             </td>
                                             <td class="py-2">
@@ -675,7 +675,7 @@ function deleteClient(clientId, clientName) {
                                                     <div class="d-flex bg-info-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
                                                         <i class="bi bi-shield-check text-info" style="font-size: 12px;"></i>
                                                     </div>
-                                                    <p class="fw-bold mb-0">BBBEE Verification :</p>
+                                                    <p class="fw-bold mb-0">BBBEE Veri. :</p>
                                                 </div>
                                             </td>
                                             <td class="py-2">

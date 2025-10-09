@@ -75,11 +75,7 @@ return array(
             'method' => 'displayClientsShortcode',
             'description' => 'Display all clients in a table',
         ),
-        'wecoza_display_single_client' => array(
-            'controller' => 'WeCozaClients\\Controllers\\ClientsController',
-            'method' => 'displaySingleClientShortcode',
-            'description' => 'Display single client details',
-        ),
+
         'wecoza_locations_capture' => array(
             'controller' => 'WeCozaClients\\Controllers\\LocationsController',
             'method' => 'captureLocationShortcode',
