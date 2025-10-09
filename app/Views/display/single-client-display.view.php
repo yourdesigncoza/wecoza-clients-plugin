@@ -90,7 +90,7 @@ $renderDataList = function ($items) use ($formatListValue) {
                 </div>
                 <div class="col-md-4">
                     <div class="bg-light rounded-3 p-3 h-100">
-                        <p class="text-uppercase text-muted fs-10 mb-2"><?php esc_html_e('Financial Year End', 'wecoza-clients'); ?></p>
+                        <p class="text-uppercase text-muted fs-10 mb-2"><?php esc_html_e('Financial YE', 'wecoza-clients'); ?></p>
                         <p class="fw-semibold mb-0"><?php echo esc_html(ViewHelpers::formatDate($client['financial_year_end'] ?? '')); ?></p>
                     </div>
                 </div>
@@ -99,7 +99,7 @@ $renderDataList = function ($items) use ($formatListValue) {
             <div class="row g-3 mt-1">
                 <div class="col-md-4">
                     <div class="bg-light rounded-3 p-3 h-100">
-                        <p class="text-uppercase text-muted fs-10 mb-2"><?php esc_html_e('BBBEE Verification Date', 'wecoza-clients'); ?></p>
+                        <p class="text-uppercase text-muted fs-10 mb-2"><?php esc_html_e('BBBEE Veri. Date', 'wecoza-clients'); ?></p>
                         <p class="fw-semibold mb-0"><?php echo esc_html(ViewHelpers::formatDate($client['bbbee_verification_date'] ?? '')); ?></p>
                     </div>
                 </div>

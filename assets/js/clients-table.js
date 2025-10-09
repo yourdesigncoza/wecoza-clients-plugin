@@ -117,6 +117,126 @@
     }
 
     // Global functions for table actions
+    window.viewClientDetails = function(clientId) {
+        // Show modal with loading state
+        const $modal = $('#clientDetailsModal');
+        const $loading = $('#clientDetailsLoading');
+        const $content = $('#clientDetailsContent');
+        
+        $loading.removeClass('d-none');
+        $content.addClass('d-none');
+        
+        // Show modal
+        const modal = new bootstrap.Modal($modal[0]);
+        modal.show();
+        
+        // Fetch client details via AJAX
+        $.ajax({
+            url: wecozaClients.ajaxUrl,
+            method: 'POST',
+            data: {
+                action: 'wecoza_get_client_details',
+                client_id: clientId,
+                nonce: wecozaClients.nonce
+            },
+            success: function(response) {
+                if (response.success) {
+                    populateClientModal(response.data);
+                    $loading.addClass('d-none');
+                    $content.removeClass('d-none');
+                    
+                    // Setup update button
+                    $('#updateClientBtn').off('click').on('click', function() {
+                        window.location.href = response.data.edit_url;
+                    });
+                } else {
+                    showError('Failed to load client details: ' + (response.data.message || 'Unknown error'));
+                }
+            },
+            error: function() {
+                showError('An error occurred while loading client details.');
+            }
+        });
+    };
+
+    function populateClientModal(client) {
+        // Helper function to format date
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            try {
+                const date = new Date(dateString);
+                return date.toLocaleDateString('en-ZA', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch (e) {
+                return dateString;
+            }
+        }
+
+        // Helper function to create status badge
+        function createStatusBadge(status) {
+            if (!status) return 'N/A';
+            
+            const statusColors = {
+                'active': 'badge-phoenix-success',
+                'inactive': 'badge-phoenix-secondary', 
+                'lead': 'badge-phoenix-warning',
+                'lost': 'badge-phoenix-danger',
+                'prospect': 'badge-phoenix-info'
+            };
+            
+            const colorClass = statusColors[status.toLowerCase()] || 'badge-phoenix-primary';
+            return `<span class="badge badge-phoenix fs-10 ${colorClass}">${status.charAt(0).toUpperCase() + status.slice(1)}</span>`;
+        }
+
+        // Basic Information
+        $('#modalClientName').text(client.client_name || 'N/A');
+        $('#modalSiteName').text(client.site_name || 'N/A');
+        $('#modalCompanyReg').text(client.company_registration_nr || 'N/A');
+        $('#modalMainClient').text(client.main_client_name || (client.main_client_id ? `ID: ${client.main_client_id}` : 'N/A'));
+        
+        // Location Information
+        $('#modalProvince').text(client.client_province || 'N/A');
+        $('#modalTown').text(client.client_town || 'N/A');
+        $('#modalStreetAddress').text(client.client_street_address || 'N/A');
+        $('#modalPostalCode').text(client.client_postal_code || 'N/A');
+        
+        // Contact Information
+        $('#modalContactPerson').text(client.contact_person || 'N/A');
+        if (client.contact_person_email) {
+            $('#modalContactEmail').html(`<a href="mailto:${client.contact_person_email}" class="text-primary text-decoration-underline">${client.contact_person_email}</a>`);
+        } else {
+            $('#modalContactEmail').text('N/A');
+        }
+        $('#modalContactCellphone').text(client.contact_person_cellphone || 'N/A');
+        $('#modalContactTel').text(client.contact_person_tel || 'N/A');
+        
+        // Additional Details
+        $('#modalSETA').text(client.seta || 'N/A');
+        $('#modalClientStatus').html(createStatusBadge(client.client_status));
+        $('#modalFinancialYearEnd').text(client.financial_year_end || 'N/A');
+        $('#modalBBBEEVerificationDate').text(client.bbbee_verification_date || 'N/A');
+        $('#modalCreatedDate').text(formatDate(client.created_at));
+        $('#modalUpdatedDate').text(formatDate(client.updated_at));
+        $('#modalAddressLine2').text(client.client_address_line_2 || 'N/A');
+    }
+
+    function showError(message) {
+        const $modal = $('#clientDetailsModal');
+        const $loading = $('#clientDetailsLoading');
+        
+        $loading.html(`
+            <div class="alert alert-danger" role="alert">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                ${message}
+            </div>
+        `);
+    }
+
     window.refreshClients = function() {
         window.location.reload();
     };
@@ -124,7 +244,7 @@
     window.exportClients = function() {
         const form = document.createElement('form');
         form.method = 'POST';
-        form.action = ajaxurl; // WordPress AJAX URL
+        form.action = wecozaClients.ajaxUrl; // WordPress AJAX URL
         
         const nonce = document.createElement('input');
         nonce.type = 'hidden';
@@ -134,7 +254,7 @@
         const action = document.createElement('input');
         action.type = 'hidden';
         action.name = 'action';
-        action.value = 'export_clients';
+        action.value = 'wecoza_export_clients';
         
         form.appendChild(nonce);
         form.appendChild(action);
@@ -146,10 +266,10 @@
     window.deleteClient = function(clientId, clientName) {
         if (confirm('Are you sure you want to delete "' + clientName + '"? This action cannot be undone.')) {
             $.ajax({
-                url: ajaxurl,
+                url: wecozaClients.ajaxUrl,
                 method: 'POST',
                 data: {
-                    action: 'delete_client',
+                    action: 'wecoza_delete_client',
                     client_id: clientId,
                     nonce: wecozaClients.nonce
                 },

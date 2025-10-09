@@ -72,6 +72,7 @@ class ClientsController {
         // Public AJAX handlers
         add_action('wp_ajax_wecoza_save_client', array($this, 'ajaxSaveClient'));
         add_action('wp_ajax_wecoza_get_client', array($this, 'ajaxGetClient'));
+        add_action('wp_ajax_wecoza_get_client_details', array($this, 'ajaxGetClientDetails'));
         add_action('wp_ajax_wecoza_delete_client', array($this, 'ajaxDeleteClient'));
         add_action('wp_ajax_wecoza_search_clients', array($this, 'ajaxSearchClients'));
         add_action('wp_ajax_wecoza_get_branch_clients', array($this, 'ajaxGetBranchClients'));
@@ -711,6 +712,53 @@ class ClientsController {
         }
         
         wp_die(json_encode(array('success' => true, 'client' => $client)));
+    }
+    
+    /**
+     * AJAX: Get client details for modal
+     */
+    public function ajaxGetClientDetails() {
+        // Verify nonce
+        if (!check_ajax_referer('wecoza_clients_ajax', 'nonce', false)) {
+            wp_send_json_error(array('message' => 'Security check failed.'));
+        }
+        
+        // Check permissions
+        if (!current_user_can('view_wecoza_clients')) {
+            wp_send_json_error(array('message' => 'Permission denied.'));
+        }
+        
+        $clientId = isset($_POST['client_id']) ? intval($_POST['client_id']) : 0;
+        if (!$clientId) {
+            wp_send_json_error(array('message' => 'Invalid client ID.'));
+        }
+        
+        $client = $this->getModel()->getById($clientId);
+        if (!$client) {
+            wp_send_json_error(array('message' => 'Client not found.'));
+        }
+        
+        // Get additional data
+        $sitesModel = new \WeCozaClients\Models\SitesModel();
+        $headSite = $sitesModel->getHeadSite($clientId);
+        
+        // Build edit URL
+        $editUrl = site_url('/client-management', is_ssl() ? 'https' : 'http');
+        $editUrl = add_query_arg(['mode' => 'update', 'id' => $clientId], $editUrl);
+        
+        // Prepare response data
+        $data = array_merge($client, array(
+            'site_name' => $headSite['site_name'] ?? '',
+            'edit_url' => $editUrl,
+        ));
+        
+        // Get main client name if applicable
+        if (!empty($client['main_client_id'])) {
+            $mainClient = $this->getModel()->getById($client['main_client_id']);
+            $data['main_client_name'] = $mainClient['client_name'] ?? '';
+        }
+        
+        wp_send_json_success($data);
     }
     
     /**

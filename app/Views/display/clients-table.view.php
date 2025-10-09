@@ -178,6 +178,11 @@ $editUrl = site_url('/client-management', is_ssl() ? 'https' : 'http');
                             <i class="bi bi-person-badge ms-1"></i>
                             <span class="sort-indicator d-none"><i class="bi bi-chevron-up"></i></span>
                         </th>
+                        <th scope="col" class="border-0" data-sortable="true" data-sort-key="main_client_id" data-sort-type="numeric">
+                            Branch
+                            <i class="bi bi-diagram-2 ms-1"></i>
+                            <span class="sort-indicator d-none"><i class="bi bi-chevron-up"></i></span>
+                        </th>
                         <th scope="col" class="border-0" data-sortable="true" data-sort-key="company_registration_nr" data-sort-type="text">
                             Company Reg
                             <i class="bi bi-building ms-1"></i>
@@ -208,7 +213,7 @@ $editUrl = site_url('/client-management', is_ssl() ? 'https' : 'http');
                     <?php if (!empty($clients)): ?>
                         <?php foreach ($clients as $client): ?>
                             <?php 
-                            $statusClass = $statusBadgeMap[$client['client_status']] ?? 'badge-phoenix-secondary';
+                            $statusClass = $statusBadgeMap[$client['client_status']] ?? 'badge-phoenix-info';
                             $createdDate = !empty($client['created_at']) ? date('M j, Y', strtotime($client['created_at'])) : '';
                             $editLink = add_query_arg(['mode' => 'update', 'client_id' => $client['id']], $editUrl);
                             ?>
@@ -222,18 +227,25 @@ $editUrl = site_url('/client-management', is_ssl() ? 'https' : 'http');
                                     <span class="fw-medium">
                                         <?php echo esc_html($client['client_name']); ?>
                                     </span>
+                                </td>
+                                <td>
                                     <?php if (!empty($client['main_client_id'])): ?>
-                                        <small class="text-muted d-block">(Branch of ID: <?php echo (int) $client['main_client_id']; ?>)</small>
+                                        <span class="badge badge-phoenix badge-phoenix-secondary">
+                                            <?php 
+                                            $mainName = !empty($client['main_client_name']) ? esc_html($client['main_client_name']) : 'Unknown';
+                                            echo $mainName . ' #' . (int) $client['main_client_id']; 
+                                            ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <small class="text-muted">&nbsp;</small>
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <small class="text-muted">
                                         <?php echo esc_html($client['company_registration_nr'] ?: 'N/A'); ?>
-                                    </small>
                                 </td>
                                 <td>
                                     <?php if (!empty($client['seta'])): ?>
-                                        <span class="badge bg-info bg-opacity-10 text-info">
+                                        <span class="badge badge-phoenix badge-phoenix-secondary">
                                             <?php echo esc_html($client['seta']); ?>
                                         </span>
                                     <?php else: ?>
@@ -241,7 +253,7 @@ $editUrl = site_url('/client-management', is_ssl() ? 'https' : 'http');
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <span class="badge <?php echo esc_attr($statusClass); ?>">
+                                    <span class="badge badge-phoenix  <?php echo esc_attr($statusClass); ?>">
                                         <?php echo esc_html($client['client_status']); ?>
                                     </span>
                                 </td>
@@ -254,32 +266,17 @@ $editUrl = site_url('/client-management', is_ssl() ? 'https' : 'http');
                                         <small class="text-muted">N/A</small>
                                     <?php endif; ?>
                                 </td>
-                                <td class="pe-4">
-                                    <div class="dropdown">
-                                        <button class="btn btn-link text-body btn-sm dropdown-toggle" style="text-decoration: none;" type="button" id="dropdownMenuButton<?php echo (int) $client['id']; ?>" data-bs-toggle="dropdown" aria-expanded="false">
-                                            <i class="bi bi-three-dots"></i>
+                                <td class="text-center">
+                                    <div class="d-flex justify-content-center gap-2" role="group">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary border-0" title="View Details" onclick="viewClientDetails(<?php echo (int) $client['id']; ?>)">
+                                            <i class="bi bi-eye"></i>
                                         </button>
-                                        <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton<?php echo (int) $client['id']; ?>">
-                                            <li>
-                                                <a class="dropdown-item" href="<?php echo esc_url($editLink); ?>">
-                                                    Edit Client
-                                                    <i class="bi bi-pencil ms-2"></i>
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <a class="dropdown-item" href="<?php echo esc_url(add_query_arg('client_id', $client['id'], site_url('/client-management', is_ssl() ? 'https' : 'http'))); ?>">
-                                                    View Details
-                                                    <i class="bi bi-eye ms-2"></i>
-                                                </a>
-                                            </li>
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li>
-                                                <button type="button" class="dropdown-item text-danger" onclick="deleteClient(<?php echo (int) $client['id']; ?>, '<?php echo esc_js($client['client_name']); ?>')">
-                                                    Delete Client
-                                                    <i class="bi bi-trash ms-2"></i>
-                                                </button>
-                                            </li>
-                                        </ul>
+                                        <a href="<?php echo esc_url($editLink); ?>" class="btn btn-sm btn-outline-secondary border-0" title="Edit Client">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary border-0" title="Delete Client" onclick="deleteClient(<?php echo (int) $client['id']; ?>, '<?php echo esc_js($client['client_name']); ?>')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -427,3 +424,333 @@ function deleteClient(clientId, clientName) {
     }
 }
 </script>
+
+<!-- Client Details Modal -->
+<div class="modal fade" id="clientDetailsModal" tabindex="-1" aria-labelledby="clientDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title" id="clientDetailsModalLabel">
+                    <i class="bi bi-person-badge me-2"></i>
+                    Client Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="clientDetailsLoading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Loading client details...</p>
+                </div>
+                
+                <div id="clientDetailsContent" class="d-none">
+                    <div class="px-xl-4 mb-7">
+                        <div class="row mx-0">
+                            <!-- Left Column - Basic Information & Location -->
+                            <div class="col-sm-12 col-xxl-6 border-bottom border-end-xxl py-3">
+                                <table class="w-100 table-stats table table-hover table-sm fs-9 mb-0">
+                                    <tbody>
+                                        <!-- Client Name -->
+                                        <tr>
+                                            <td class="py-2 ydcoza-w-150">
+                                                <div class="d-inline-flex align-items-center">
+                                                    <div class="d-flex bg-primary-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-building text-primary" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">Client Name :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalClientName"></p>
+                                            </td>
+                                        </tr>
+                                        <!-- Site Name -->
+                                        <tr>
+                                            <td class="py-2">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="d-flex bg-info-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-geo-alt text-info" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">Site Name :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalSiteName"></p>
+                                            </td>
+                                        </tr>
+                                        <!-- Company Registration -->
+                                        <tr>
+                                            <td class="py-2">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="d-flex bg-warning-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-hash text-warning" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">Company Reg :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalCompanyReg"></p>
+                                            </td>
+                                        </tr>
+                                        <!-- Main Client -->
+                                        <tr>
+                                            <td class="py-2">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="d-flex bg-success-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-layers text-success" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">Main Client :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalMainClient"></p>
+                                            </td>
+                                        </tr>
+                                        <!-- Province -->
+                                        <tr>
+                                            <td class="py-2">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="d-flex bg-primary-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-pin-map text-primary" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">Province :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalProvince"></p>
+                                            </td>
+                                        </tr>
+                                        <!-- Town -->
+                                        <tr>
+                                            <td class="py-2">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="d-flex bg-info-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-geo-alt text-info" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">Town :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalTown"></p>
+                                            </td>
+                                        </tr>
+                                        <!-- Street Address -->
+                                        <tr>
+                                            <td class="py-2">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="d-flex bg-success-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-house-door text-success" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">Street Address :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalStreetAddress"></p>
+                                            </td>
+                                        </tr>
+                                        <!-- Postal Code -->
+                                        <tr>
+                                            <td class="py-2">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="d-flex bg-secondary-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-mailbox text-secondary" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">Postal Code :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalPostalCode"></p>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <!-- Right Column - Contact & Status -->
+                            <div class="col-sm-12 col-xxl-6 border-bottom py-3">
+                                <table class="w-100 table-stats table table-hover table-sm fs-9 mb-0">
+                                    <tbody>
+                                        <!-- Contact Person -->
+                                        <tr>
+                                            <td class="py-2 ydcoza-w-150">
+                                                <div class="d-inline-flex align-items-center">
+                                                    <div class="d-flex bg-primary-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-person text-primary" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">Contact Person :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalContactPerson"></p>
+                                            </td>
+                                        </tr>
+                                        <!-- Email -->
+                                        <tr>
+                                            <td class="py-2">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="d-flex bg-info-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-envelope text-info" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">Email :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalContactEmail"></p>
+                                            </td>
+                                        </tr>
+                                        <!-- Cellphone -->
+                                        <tr>
+                                            <td class="py-2">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="d-flex bg-success-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-phone text-success" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">Cellphone :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalContactCellphone"></p>
+                                            </td>
+                                        </tr>
+                                        <!-- Telephone -->
+                                        <tr>
+                                            <td class="py-2">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="d-flex bg-warning-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-telephone text-warning" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">Telephone :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalContactTel"></p>
+                                            </td>
+                                        </tr>
+                                        <!-- SETA -->
+                                        <tr>
+                                            <td class="py-2">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="d-flex bg-primary-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-award text-primary" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">SETA :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalSETA"></p>
+                                            </td>
+                                        </tr>
+                                        <!-- Client Status -->
+                                        <tr>
+                                            <td class="py-2">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="d-flex bg-success-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-check-circle text-success" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">Client Status :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalClientStatus"></p>
+                                            </td>
+                                        </tr>
+                                        <!-- Financial Year End -->
+                                        <tr>
+                                            <td class="py-2">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="d-flex bg-warning-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-calendar-event text-warning" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">Financial Year End :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalFinancialYearEnd"></p>
+                                            </td>
+                                        </tr>
+                                        <!-- BBBEE Verification Date -->
+                                        <tr>
+                                            <td class="py-2">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="d-flex bg-info-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-shield-check text-info" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">BBBEE Verification :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalBBBEEVerificationDate"></p>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <!-- Bottom Left - Timestamps -->
+                            <div class="col-sm-12 col-xxl-6 border-end-xxl py-3">
+                                <table class="w-100 table-stats table table-hover table-sm fs-9 mb-0">
+                                    <tbody>
+                                        <!-- Created Date -->
+                                        <tr>
+                                            <td class="py-2">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="d-flex bg-success-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-calendar-plus text-success" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">Created :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalCreatedDate"></p>
+                                            </td>
+                                        </tr>
+                                        <!-- Updated Date -->
+                                        <tr>
+                                            <td class="py-2">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="d-flex bg-primary-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-calendar-check text-primary" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">Last Updated :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalUpdatedDate"></p>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <!-- Bottom Right - Empty for balance -->
+                            <div class="col-sm-12 col-xxl-6 py-3">
+                                <table class="w-100 table-stats table table-hover table-sm fs-9 mb-0">
+                                    <tbody>
+                                        <tr>
+                                            <td class="py-2">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="d-flex bg-secondary-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-info-circle text-secondary" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">Address Line 2 :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalAddressLine2"></p>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-subtle-warning" data-bs-dismiss="modal">Close</button>
+                <button type="button" id="updateClientBtn" class="btn btn-subtle-info">
+                    <i class="bi bi-pencil me-2"></i>
+                    Update Client
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -244,7 +244,8 @@ class ClientsModel {
     public function getAll($params = []) {
         $alias = 'c';
         $primaryKey = $this->resolvedPrimaryKey;
-        $sql = "SELECT {$alias}.*, {$alias}.{$primaryKey} AS id FROM {$this->table} {$alias}";
+        $sql = "SELECT {$alias}.*, {$alias}.{$primaryKey} AS id, mc.client_name AS main_client_name FROM {$this->table} {$alias} 
+                LEFT JOIN {$this->table} mc ON {$alias}.main_client_id = mc.{$primaryKey}";
         $where = [];
         $bindings = [];
 
