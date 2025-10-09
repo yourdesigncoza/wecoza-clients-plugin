@@ -37,6 +37,9 @@ foreach ($provinces as $province) {
 
     <form method="POST" class="needs-validation ydcoza-compact-form" novalidate>
         <?php wp_nonce_field('submit_locations_form', 'wecoza_locations_form_nonce'); ?>
+        <?php if (!empty($location['location_id'])) : ?>
+            <input type="hidden" name="location_id" value="<?php echo (int) $location['location_id']; ?>">
+        <?php endif; ?>
 
         <div class="row mb-4">
             <div class="col-12">

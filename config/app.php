@@ -85,6 +85,16 @@ return array(
             'method' => 'captureLocationShortcode',
             'description' => 'Display locations capture form',
         ),
+        'wecoza_locations_edit' => array(
+            'controller' => 'WeCozaClients\\Controllers\\LocationsController',
+            'method' => 'editLocationShortcode',
+            'description' => 'Edit existing location',
+        ),
+        'wecoza_locations_list' => array(
+            'controller' => 'WeCozaClients\\Controllers\\LocationsController',
+            'method' => 'listLocationsShortcode',
+            'description' => 'Display locations table',
+        ),
     ),
 
     /**
