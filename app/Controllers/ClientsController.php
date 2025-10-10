@@ -316,9 +316,9 @@ class ClientsController {
         
         // Transform to proper format for select options: id => client_name
         $main_clients = ['' => 'Select Main Client'];
-        foreach ($main_clients_raw as $client) {
-            if (isset($client['id']) && isset($client['client_name'])) {
-                $main_clients[$client['id']] = $client['client_name'];
+        foreach ($main_clients_raw as $mainClient) {
+            if (isset($mainClient['id']) && isset($mainClient['client_name'])) {
+                $main_clients[$mainClient['id']] = $mainClient['client_name'];
             }
         }
         
@@ -564,9 +564,9 @@ class ClientsController {
         
         // Transform to proper format for select options: id => client_name
         $main_clients = ['' => 'Select Main Client'];
-        foreach ($main_clients_raw as $client) {
-            if (isset($client['id']) && isset($client['client_name'])) {
-                $main_clients[$client['id']] = $client['client_name'];
+        foreach ($main_clients_raw as $mainClient) {
+            if (isset($mainClient['id']) && isset($mainClient['client_name'])) {
+                $main_clients[$mainClient['id']] = $mainClient['client_name'];
             }
         }
         
