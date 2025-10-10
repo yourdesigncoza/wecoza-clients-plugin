@@ -41,29 +41,39 @@ Connection settings are stored as WordPress options and must be configured durin
 
 ## Shortcodes
 
-### Client Capture Form
-```
+### Client Management Shortcodes
+
+#### Client Capture Form
+```shortcode
 [wecoza_capture_clients]
 ```
-Renders a client creation/editing form with full validation.
+Renders a comprehensive client creation/editing form with full validation, hierarchical relationships, and file upload support.
 
-### Client Display Table
-```
+#### Client Display Table
+```shortcode
 [wecoza_display_clients per_page="10" show_search="true"]
 ```
-Shows a paginated table of clients with search and filtering options.
+Shows a paginated table of clients with advanced search and filtering options, including hierarchy support and modal views.
 
-### Single Client View
-```
-[wecoza_display_single_client id="123"]
-```
-Displays detailed information for a specific client.
+### Location Management Shortcodes
 
-### Location Capture Form
-```
+#### Location Capture Form
+```shortcode
 [wecoza_locations_capture]
 ```
-Captures new locations (suburb, town, province, postal code) and persists latitude/longitude via Google Maps autocomplete.
+Captures new locations with Google Maps autocomplete for suburb/town selection, automatically persisting latitude and longitude coordinates.
+
+#### Location List
+```shortcode
+[wecoza_locations_list]
+```
+Displays all locations in a searchable, sortable table format with edit and delete functionality.
+
+#### Location Edit Form
+```shortcode
+[wecoza_locations_edit]
+```
+Provides an editable form for existing locations (requires location ID parameter for editing specific entries).
 
 ## Architecture
 

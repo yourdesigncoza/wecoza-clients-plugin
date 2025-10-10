@@ -1,6 +1,11 @@
 <?php
 /**
- * Main plugin class
+ * WeCoza Clients Plugin - Comprehensive Client and Location Management System
+ *
+ * A WordPress plugin providing advanced client relationship management with hierarchical
+ * client structures, PostgreSQL backend integration, and location management with
+ * Google Maps support. Features MVC architecture, SETA compliance, and full CRUD
+ * operations for client and location data.
  *
  * @package WeCozaClients
  * @since 1.0.0
