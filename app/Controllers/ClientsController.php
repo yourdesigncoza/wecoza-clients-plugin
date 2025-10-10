@@ -55,6 +55,15 @@ class ClientsController {
     protected function getSitesModel() {
         return $this->getModel()->getSitesModel();
     }
+
+    /**
+     * Get contacts model instance
+     *
+     * @return \WeCozaClients\Models\ClientContactsModel
+     */
+    protected function getContactsModel() {
+        return $this->getModel()->getContactsModel();
+    }
     
     /**
      * Register shortcodes
@@ -62,6 +71,7 @@ class ClientsController {
     protected function registerShortcodes() {
         add_shortcode('wecoza_capture_clients', array($this, 'captureClientShortcode'));
         add_shortcode('wecoza_display_clients', array($this, 'displayClientsShortcode'));
+        add_shortcode('wecoza_update_clients', array($this, 'updateClientShortcode'));
     }
     
     /**
@@ -302,7 +312,15 @@ class ClientsController {
         );
         
         // Get main clients for sub-client dropdown
-        $main_clients = $this->getModel()->getMainClients();
+        $main_clients_raw = $this->getModel()->getMainClients();
+        
+        // Transform to proper format for select options: id => client_name
+        $main_clients = ['' => 'Select Main Client'];
+        foreach ($main_clients_raw as $client) {
+            if (isset($client['id']) && isset($client['client_name'])) {
+                $main_clients[$client['id']] = $client['client_name'];
+            }
+        }
         
         // Load view
         return \WeCozaClients\view('components/client-capture-form', array(
@@ -314,6 +332,7 @@ class ClientsController {
             'location_data' => $locationData,
             'sites' => $sitesData,
             'main_clients' => $main_clients,
+            'main_clients_raw' => $main_clients_raw,
         ));
     }
     
@@ -334,6 +353,8 @@ class ClientsController {
             'show_search' => true,
             'show_filters' => true,
             'show_export' => true,
+            'edit_url' => '/app/all-clients',
+            'add_url' => '/app/all-clients',
         ), $atts);
         
         // Get query parameters
@@ -380,7 +401,189 @@ class ClientsController {
         ));
     }
     
+    /**
+     * Client update form shortcode
+     *
+     * @param array $atts Shortcode attributes
+     * @return string
+     */
+    public function updateClientShortcode($atts) {
+        // Check permissions
+        if (!current_user_can('edit_wecoza_clients')) {
+            return '<p>' . __('You do not have permission to update clients.', 'wecoza-clients') . '</p>';
+        }
+        
+        // Get client ID from URL parameters
+        $mode = isset($_GET['mode']) ? sanitize_text_field($_GET['mode']) : '';
+        $clientId = isset($_GET['client_id']) ? intval($_GET['client_id']) : 0;
+        
+        // Validate update mode and client ID
+        if ($mode !== 'update' || $clientId <= 0) {
+            return '<p>' . __('Invalid update request. Please access via the clients table edit button.', 'wecoza-clients') . '</p>';
+        }
+        
+        $client = null;
+        $errors = array();
+        $success = false;
+        $submittedClient = array();
+        $submittedSite = array();
+        
+        // Get client data
+        $client = $this->getModel()->getById($clientId);
+        if (!$client) {
+            return '<p>' . __('Client not found.', 'wecoza-clients') . '</p>';
+        }
 
+        // Merge primary contact information to ensure form population
+        $contactDefaults = array(
+            'name' => $client['contact_person'] ?? '',
+            'email' => $client['contact_person_email'] ?? '',
+            'cellphone' => $client['contact_person_cellphone'] ?? '',
+            'telephone' => $client['contact_person_tel'] ?? '',
+            'position' => $client['contact_person_position'] ?? '',
+            'site_id' => $client['contact_site_id'] ?? null,
+        );
+
+        $primaryContact = $this->getContactsModel()->getPrimaryContact($clientId);
+        if (is_array($primaryContact)) {
+            $contactNameParts = array_filter(array(
+                $primaryContact['first_name'] ?? '',
+                $primaryContact['surname'] ?? '',
+            ));
+
+            $resolvedName = trim(implode(' ', $contactNameParts));
+
+            if ($resolvedName === '' && !empty($primaryContact['email'])) {
+                $resolvedName = $primaryContact['email'];
+            }
+
+            $contactDefaults = array(
+                'name' => $resolvedName,
+                'email' => $primaryContact['email'] ?? '',
+                'cellphone' => $primaryContact['cellphone_number'] ?? '',
+                'telephone' => $primaryContact['tel_number'] ?? '',
+                'position' => $primaryContact['position'] ?? '',
+                'site_id' => !empty($primaryContact['site_id']) ? (int) $primaryContact['site_id'] : null,
+            );
+
+            if (empty($client['contact_person'])) {
+                $client['contact_person'] = $contactDefaults['name'];
+            }
+            if (empty($client['contact_person_email'])) {
+                $client['contact_person_email'] = $contactDefaults['email'];
+            }
+            if (empty($client['contact_person_cellphone'])) {
+                $client['contact_person_cellphone'] = $contactDefaults['cellphone'];
+            }
+            if (empty($client['contact_person_tel'])) {
+                $client['contact_person_tel'] = $contactDefaults['telephone'];
+            }
+            if (empty($client['contact_person_position'])) {
+                $client['contact_person_position'] = $contactDefaults['position'];
+            }
+            if (empty($client['contact_site_id']) && $contactDefaults['site_id']) {
+                $client['contact_site_id'] = $contactDefaults['site_id'];
+            }
+        }
+        
+        // Filter client data to only include known safe scalar fields
+        $client = $this->filterClientDataForForm($client);
+        
+        // Handle form submission (non-AJAX fallback)
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['nonce']) && !wp_doing_ajax()) {
+            if (!check_ajax_referer('wecoza_clients_ajax', 'nonce', false)) {
+                $errors[] = __('Security check failed. Please try again.', 'wecoza-clients');
+            } else {
+                $result = $this->handleFormSubmission($clientId);
+                if ($result['success']) {
+                    $success = true;
+                    $client = $result['client'];
+                } else {
+                    $errors = $result['errors'];
+                    if (!empty($result['data']['client']) && is_array($result['data']['client'])) {
+                        $submittedClient = $result['data']['client'];
+                    }
+                    if (!empty($result['data']['site']) && is_array($result['data']['site'])) {
+                        $submittedSite = $result['data']['site'];
+                    }
+                }
+            }
+        }
+
+        if (!empty($submittedClient)) {
+            $client = array_merge($client, $submittedClient);
+        }
+        
+        // Apply filtering after merging to ensure no array values slip through
+        $client = $this->filterClientDataForForm($client);
+        
+        // Get dropdown data
+        $config = \WeCozaClients\config('app');
+        $seta_options = $config['seta_options'];
+        $status_options = $config['client_status_options'];
+
+        $sitesData = array('head' => null, 'sub_sites' => array());
+        $sitesData = $this->getSitesModel()->getSitesByClient($client['id']);
+        if (!empty($submittedSite)) {
+            $sitesData['head'] = array_merge($sitesData['head'] ?? array(), $submittedSite);
+            if (!empty($submittedSite['place_id'])) {
+                $client['client_town_id'] = $submittedSite['place_id'];
+            }
+            if (!empty($submittedSite['address_line_1'])) {
+                $client['client_street_address'] = $submittedSite['address_line_1'];
+            }
+            if (!empty($submittedSite['address_line_2'])) {
+                $client['client_address_line_2'] = $submittedSite['address_line_2'];
+            }
+            if (!empty($submittedSite['site_name'])) {
+                $client['site_name'] = $submittedSite['site_name'];
+            }
+        }
+
+        $selectedProvince = $client['client_province'] ?? ($client['client_location']['province'] ?? '');
+        $selectedTown = $client['client_town'] ?? ($client['client_location']['town'] ?? '');
+        $selectedSuburb = $client['client_suburb'] ?? ($client['client_location']['suburb'] ?? '');
+        $selectedLocationId = !empty($client['client_town_id']) ? (int) $client['client_town_id'] : null;
+        $selectedPostal = $client['client_postal_code'] ?? ($client['client_location']['postal_code'] ?? '');
+
+        $hierarchy = $this->getSitesModel()->getLocationHierarchy();
+
+        $locationData = array(
+            'hierarchy' => $hierarchy,
+            'selected' => array(
+                'province' => $selectedProvince,
+                'town' => $selectedTown,
+                'suburb' => $selectedSuburb,
+                'locationId' => $selectedLocationId,
+                'postalCode' => $selectedPostal,
+            ),
+        );
+        
+        // Get main clients for sub-client dropdown
+        $main_clients_raw = $this->getModel()->getMainClients();
+        
+        // Transform to proper format for select options: id => client_name
+        $main_clients = ['' => 'Select Main Client'];
+        foreach ($main_clients_raw as $client) {
+            if (isset($client['id']) && isset($client['client_name'])) {
+                $main_clients[$client['id']] = $client['client_name'];
+            }
+        }
+        
+        // Load view with update-specific flag
+        return \WeCozaClients\view('components/client-update-form', array(
+            'client' => $client,
+            'errors' => $errors,
+            'success' => $success,
+            'seta_options' => $seta_options,
+            'status_options' => $status_options,
+            'location_data' => $locationData,
+            'sites' => $sitesData,
+            'main_clients' => $main_clients,
+            'contact_defaults' => $contactDefaults,
+            'is_update_mode' => true,
+        ));
+    }
     
     /**
      * Handle form submission
@@ -586,6 +789,97 @@ class ClientsController {
             'site' => $site,
             'contact' => $contact,
         );
+    }
+    
+    /**
+     * Filter and process client data for form rendering
+     *
+     * @param array $client Raw client data from database
+     * @return array Processed client data with safe fields
+     */
+    protected function filterClientDataForForm($client) {
+        if (!is_array($client)) {
+            return array();
+        }
+        
+        $processed = array();
+        
+        // First, extract basic scalar fields
+        $scalarFields = array(
+            'id', 'client_name', 'company_registration_nr', 'seta', 'client_status',
+            'financial_year_end', 'bbbee_verification_date', 'main_client_id',
+            'created_at', 'updated_at',
+            'contact_person', 'contact_person_email', 'contact_person_cellphone', 
+            'contact_person_tel', 'contact_person_position',
+            'client_street_address', 'client_address_line_2', 'client_province', 
+            'client_town', 'client_suburb', 'client_postal_code', 'client_town_id',
+        );
+        
+        foreach ($scalarFields as $field) {
+            if (array_key_exists($field, $client)) {
+                $value = $client[$field];
+                if (is_scalar($value) || is_null($value)) {
+                    $processed[$field] = $value;
+                }
+            }
+        }
+        
+        // Extract site data from head_site array if available
+        if (!empty($client['head_site']) && is_array($client['head_site'])) {
+            $headSite = $client['head_site'];
+            
+            // Map site fields to form fields
+            if (!empty($headSite['site_id']) && !isset($processed['site_id'])) {
+                $processed['site_id'] = $headSite['site_id'];
+            }
+            if (!empty($headSite['site_name']) && !isset($processed['site_name'])) {
+                $processed['site_name'] = $headSite['site_name'];
+            }
+            if (!empty($headSite['address_line_1']) && !isset($processed['client_street_address'])) {
+                $processed['client_street_address'] = $headSite['address_line_1'];
+            }
+            if (!empty($headSite['address_line_2']) && !isset($processed['client_address_line_2'])) {
+                $processed['client_address_line_2'] = $headSite['address_line_2'];
+            }
+            if (!empty($headSite['place_id']) && !isset($processed['client_town_id'])) {
+                $processed['client_town_id'] = $headSite['place_id'];
+            }
+            
+            // Extract location data from nested location array
+            if (!empty($headSite['location']) && is_array($headSite['location'])) {
+                $location = $headSite['location'];
+                if (!empty($location['province']) && !isset($processed['client_province'])) {
+                    $processed['client_province'] = $location['province'];
+                }
+                if (!empty($location['town']) && !isset($processed['client_town'])) {
+                    $processed['client_town'] = $location['town'];
+                }
+                if (!empty($location['suburb']) && !isset($processed['client_suburb'])) {
+                    $processed['client_suburb'] = $location['suburb'];
+                }
+                if (!empty($location['postal_code']) && !isset($processed['client_postal_code'])) {
+                    $processed['client_postal_code'] = $location['postal_code'];
+                }
+            }
+        }
+        
+        // Keep client_location array if it exists and is properly structured
+        if (!empty($client['client_location']) && is_array($client['client_location'])) {
+            $processed['client_location'] = $client['client_location'];
+        }
+        
+        // Log what fields were processed vs filtered for debugging
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            $processedFields = array_keys($processed);
+            $allFields = array_keys($client);
+            $filteredFields = array_diff($allFields, $processedFields);
+            if (!empty($filteredFields)) {
+                error_log('WECOZA: Processed fields: ' . implode(', ', $processedFields));
+                error_log('WECOZA: Filtered out fields: ' . print_r($filteredFields, true));
+            }
+        }
+        
+        return $processed;
     }
     
     /**

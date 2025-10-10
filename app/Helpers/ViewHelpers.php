@@ -96,6 +96,10 @@ class ViewHelpers {
      * Render input field
      */
     private static function renderInput($type, $name, $value, $options) {
+        // Convert arrays to empty string to prevent "Array to string conversion" errors
+        if (is_array($value)) {
+            $value = '';
+        }
         ?>
         <input 
             type="<?php echo esc_attr($type); ?>"
@@ -120,6 +124,10 @@ class ViewHelpers {
      * Render textarea field
      */
     private static function renderTextarea($name, $value, $options) {
+        // Convert arrays to empty string to prevent "Array to string conversion" errors
+        if (is_array($value)) {
+            $value = '';
+        }
         ?>
         <textarea 
             id="<?php echo esc_attr($options['id']); ?>"

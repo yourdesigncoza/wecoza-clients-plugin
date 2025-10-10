@@ -1,6 +1,6 @@
 <?php
 /**
- * Client Capture Form View
+ * Client Update Form View
  *
  * @package WeCozaClients
  * @since 1.0.0
@@ -19,6 +19,8 @@ $location_selected = $location_data['selected'] ?? array();
 $location_hierarchy = $location_data['hierarchy'] ?? array();
 $sites = $sites ?? array('head' => null, 'sub_sites' => array());
 $main_clients = $main_clients ?? array();
+$contact_defaults = isset($contact_defaults) && is_array($contact_defaults) ? $contact_defaults : array();
+$is_update_mode = $is_update_mode ?? false;
 
 // Sub-client variables
 $is_sub_client = !empty($client['main_client_id']);
@@ -91,12 +93,18 @@ $has_town = $selected_town !== '';
 $has_location = !empty($selected_location_id);
 
 $is_edit = !empty($client['id']);
+
+$resolved_contact_person = $client['contact_person'] ?? ($contact_defaults['name'] ?? '');
+$resolved_contact_email = $client['contact_person_email'] ?? ($contact_defaults['email'] ?? '');
+$resolved_contact_cell = $client['contact_person_cellphone'] ?? ($contact_defaults['cellphone'] ?? '');
+$resolved_contact_tel = $client['contact_person_tel'] ?? ($contact_defaults['telephone'] ?? '');
+$resolved_contact_position = $client['contact_person_position'] ?? ($contact_defaults['position'] ?? '');
 ?>
 
 <div class="wecoza-clients-form-container">
     <?php if ($success) : ?>
         <?php echo ViewHelpers::renderAlert(
-            $is_edit ? 'Client updated successfully!' : 'Client created successfully!',
+            'Client updated successfully!',
             'success',
             true
         ); ?>
@@ -110,21 +118,16 @@ $is_edit = !empty($client['id']);
         <?php endif; ?>
     <?php endif; ?>
     
-    <?php if (!$is_edit) : ?>
-            <h4 class="mb-1 mt-4">Create a new Client</h4>
-            <p class="mb-5 text-muted">Before you start the upload process ensure you have all info. ready.</p>
-    <?php endif; ?>
+    <h4 class="mb-1 mt-4">Update Client</h4>
     
     <form id="clients-form" class="needs-validation ydcoza-compact-form" novalidate method="POST" enctype="multipart/form-data">
+        <?php wp_nonce_field('wecoza_clients_ajax', 'nonce'); ?>
         
-        
-        <?php if ($is_edit) : ?>
-            <input type="hidden" name="id" value="<?php echo esc_attr($client['id']); ?>">
-        <?php endif; ?>
+        <input type="hidden" name="id" value="<?php echo esc_attr($client['id']); ?>">
+        <input type="hidden" name="head_site_id" value="<?php echo esc_attr($headSiteId); ?>">
         
         <!-- Basic Information -->
         <div class="row">
-            <input type="hidden" name="head_site_id" value="<?php echo esc_attr($headSiteId); ?>">
             <?php
             echo ViewHelpers::renderField('text', 'client_name', 'Client Name', 
                 $client['client_name'] ?? '', 
@@ -198,7 +201,6 @@ $is_edit = !empty($client['id']);
                 </div>
             </div>
         </div>
-        
 
         <div class="border-top border-opacity-25 border-3 border-discovery my-5 mx-1"></div>
         
@@ -286,7 +288,7 @@ $is_edit = !empty($client['id']);
         <div class="row">
             <?php
             echo ViewHelpers::renderField('text', 'contact_person', 'Contact Person', 
-                $client['contact_person'] ?? '', 
+                $resolved_contact_person, 
                 array(
                     'required' => true,
                     'col_class' => 'col-md-3',
@@ -295,7 +297,7 @@ $is_edit = !empty($client['id']);
             );
             
             echo ViewHelpers::renderField('email', 'contact_person_email', 'Contact Person Email', 
-                $client['contact_person_email'] ?? '', 
+                $resolved_contact_email, 
                 array(
                     'required' => true,
                     'col_class' => 'col-md-3',
@@ -304,7 +306,7 @@ $is_edit = !empty($client['id']);
             );
             
             echo ViewHelpers::renderField('tel', 'contact_person_cellphone', 'Contact Person Cellphone', 
-                $client['contact_person_cellphone'] ?? '', 
+                $resolved_contact_cell, 
                 array(
                     'required' => true,
                     'col_class' => 'col-md-3',
@@ -313,7 +315,7 @@ $is_edit = !empty($client['id']);
             );
             
             echo ViewHelpers::renderField('tel', 'contact_person_tel', 'Contact Person Tel Number', 
-                $client['contact_person_tel'] ?? '', 
+                $resolved_contact_tel, 
                 array(
                     'col_class' => 'col-md-3',
                     'error' => $errors['contact_person_tel'] ?? ''
@@ -321,7 +323,7 @@ $is_edit = !empty($client['id']);
             );
 
             echo ViewHelpers::renderField('text', 'contact_person_position', 'Contact Person Position', 
-                $client['contact_person_position'] ?? '', 
+                $resolved_contact_position, 
                 array(
                     'col_class' => 'col-md-3',
                     'error' => $errors['contact_person_position'] ?? ''
@@ -333,8 +335,6 @@ $is_edit = !empty($client['id']);
         <div class="border-top border-opacity-25 border-3 border-discovery my-5 mx-1"></div>
         
         <!-- Business Information -->
-        
-        
         <div class="row mt-3">
             <?php
             // Prepare SETA options for select
@@ -385,11 +385,18 @@ $is_edit = !empty($client['id']);
         
         <div class="border-top border-opacity-25 border-3 border-discovery my-5 mx-1"></div>
         
-        <!-- Submit Button -->
-        <div class="col-md-3">
-            <button type="submit" class="btn btn-subtle-primary mt-3">
-                <?php echo $is_edit ? 'Update Client' : 'Add New Client'; ?>
-            </button>
+        <!-- Form Actions -->
+        <div class="row">
+            <div class="col-md-3">
+                <div class="d-flex gap-2">
+                    <a href="<?php echo esc_url(remove_query_arg(['mode', 'client_id'])); ?>" class="btn btn-outline-secondary mt-3">
+                        Cancel
+                    </a>
+                    <button type="submit" class="btn btn-subtle-primary mt-3" id="saveClientBtn">
+                        Update Client
+                    </button>
+                </div>
+            </div>
         </div>
     </form>
 </div>
@@ -398,14 +405,47 @@ $is_edit = !empty($client['id']);
 document.addEventListener('DOMContentLoaded', function() {
     // Form validation
     var form = document.getElementById('clients-form');
+    var submitBtn = document.getElementById('saveClientBtn');
     
     form.addEventListener('submit', function(event) {
+        event.preventDefault();
+        
         if (!form.checkValidity()) {
-            event.preventDefault();
             event.stopPropagation();
+            form.classList.add('was-validated');
+            return;
         }
         
-        form.classList.add('was-validated');
+        // Disable submit button and show loading
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Updating...';
+        
+        // Create form data
+        var formData = new FormData(form);
+        
+        // Submit via AJAX
+        fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Show success message and reload
+                location.reload();
+            } else {
+                // Show error message
+                alert('Error: ' + (data.message || 'Failed to update client. Please try again.'));
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Update Client';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = 'Update Client';
+        });
     }, false);
 
     // Sub-client checkbox functionality
@@ -437,6 +477,141 @@ document.addEventListener('DOMContentLoaded', function() {
                 mainClientSelect.setAttribute('required', 'required');
             } else {
                 mainClientSelect.removeAttribute('required');
+            }
+        }
+    }
+
+    // Province/Town/Suburb cascade
+    const provinceSelect = document.querySelector('.js-province-select');
+    const townSelect = document.querySelector('.js-town-select');
+    const suburbSelect = document.querySelector('.js-suburb-select');
+    const postalField = document.querySelector('.js-postal-field');
+    const addressField = document.querySelector('.js-address-field');
+    const address2Field = document.querySelector('.js-address-2-field');
+    
+    const locationData = <?php echo json_encode($location_hierarchy); ?>;
+    
+    function updateTownOptions() {
+        const selectedProvince = provinceSelect.value;
+        const province = locationData.find(p => p.name === selectedProvince);
+        const towns = province?.towns || [];
+        
+        // Clear current options
+        townSelect.innerHTML = '<option value="">Select Town</option>';
+        suburbSelect.innerHTML = '<option value="">Select Suburb</option>';
+        
+        // Hide town, suburb, postal, and address fields initially
+        townSelect.closest('.js-town-field').classList.add('d-none');
+        suburbSelect.closest('.js-suburb-field').classList.add('d-none');
+        postalField.classList.add('d-none');
+        addressField.classList.add('d-none');
+        address2Field.classList.add('d-none');
+        
+        if (towns.length > 0) {
+            towns.forEach(town => {
+                const option = document.createElement('option');
+                option.value = town.name;
+                option.textContent = town.name;
+                townSelect.appendChild(option);
+            });
+            
+            // Show town field
+            townSelect.closest('.js-town-field').classList.remove('d-none');
+        }
+    }
+    
+    function updateSuburbOptions() {
+        const selectedProvince = provinceSelect.value;
+        const selectedTown = townSelect.value;
+        const province = locationData.find(p => p.name === selectedProvince);
+        const town = province?.towns.find(t => t.name === selectedTown);
+        const suburbs = town?.suburbs || [];
+        
+        // Clear current options
+        suburbSelect.innerHTML = '<option value="">Select Suburb</option>';
+        
+        // Hide suburb, postal, and address fields initially
+        suburbSelect.closest('.js-suburb-field').classList.add('d-none');
+        postalField.classList.add('d-none');
+        addressField.classList.add('d-none');
+        address2Field.classList.add('d-none');
+        
+        if (suburbs.length > 0) {
+            suburbs.forEach(suburb => {
+                const option = document.createElement('option');
+                option.value = suburb.id;
+                option.textContent = suburb.name;
+                option.dataset.postalCode = suburb.postal_code || '';
+                option.dataset.suburb = suburb.name || '';
+                option.dataset.address = suburb.address || '';
+                option.dataset.address2 = suburb.address_line_2 || '';
+                suburbSelect.appendChild(option);
+            });
+            
+            // Show suburb field
+            suburbSelect.closest('.js-suburb-field').classList.remove('d-none');
+        }
+    }
+    
+    function updateAddressFields() {
+        const selectedOption = suburbSelect.options[suburbSelect.selectedIndex];
+        const postalCodeInput = document.querySelector('input[name="client_postal_code"]');
+        const streetAddressInput = document.querySelector('input[name="client_street_address"]');
+        const address2Input = document.querySelector('input[name="client_address_line_2"]');
+        const suburbHidden = document.querySelector('.js-suburb-hidden');
+        const townHidden = document.querySelector('.js-town-hidden');
+        
+        if (selectedOption && selectedOption.value) {
+            const postalCode = selectedOption.dataset.postalCode || '';
+            const address = selectedOption.dataset.address || '';
+            const address2 = selectedOption.dataset.address2 || '';
+            const suburb = selectedOption.dataset.suburb || '';
+            const town = townSelect.value || '';
+            
+            // Update field values
+            postalCodeInput.value = postalCode;
+            streetAddressInput.value = address;
+            address2Input.value = address2;
+            suburbHidden.value = suburb;
+            townHidden.value = town;
+            
+            // Show postal and address fields
+            postalField.classList.remove('d-none');
+            addressField.classList.remove('d-none');
+            address2Field.classList.remove('d-none');
+        } else {
+            // Hide fields and clear values
+            postalField.classList.add('d-none');
+            addressField.classList.add('d-none');
+            address2Field.classList.add('d-none');
+            
+            postalCodeInput.value = '';
+            streetAddressInput.value = '';
+            address2Input.value = '';
+            suburbHidden.value = '';
+            townHidden.value = '';
+        }
+    }
+    
+    if (provinceSelect) {
+        provinceSelect.addEventListener('change', updateTownOptions);
+    }
+    if (townSelect) {
+        townSelect.addEventListener('change', updateSuburbOptions);
+    }
+    if (suburbSelect) {
+        suburbSelect.addEventListener('change', updateAddressFields);
+    }
+    
+    // Initialize with existing values
+    if (provinceSelect.value) {
+        updateTownOptions();
+        if (townSelect.value) {
+            townSelect.value = '<?php echo esc_js($selected_town); ?>';
+            updateSuburbOptions();
+            if (suburbSelect.value) {
+                suburbSelect.value = '<?php echo esc_js($selected_location_id); ?>';
+                updateAddressFields();
             }
         }
     }

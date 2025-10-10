@@ -48,9 +48,9 @@ $statusBadgeMap = array(
     'Lost Client' => 'badge-phoenix-danger',
 );
 
-// Build edit URL - using capture clients shortcode with edit mode
-// This should point to a WordPress page containing [wecoza_capture_clients] shortcode
-$editUrl = site_url('/client-management', is_ssl() ? 'https' : 'http');
+// Build edit URL - using update clients shortcode with edit mode
+// This should point to a WordPress page containing [wecoza_update_clients] shortcode
+$editUrl = site_url($atts['edit_url'] ?? '/app/all-clients', is_ssl() ? 'https' : 'http');
 ?>
 
 <div class="card shadow-none border my-3" data-component-card="data-component-card">
@@ -87,7 +87,7 @@ $editUrl = site_url('/client-management', is_ssl() ? 'https' : 'http');
                         <i class="bi bi-download ms-1"></i>
                     </button>
                     <?php endif; ?>
-                    <a href="<?php echo esc_url(site_url('/client-management', is_ssl() ? 'https' : 'http')); ?>" class="btn btn-outline-primary btn-sm">
+                    <a href="<?php echo esc_url(site_url($atts['add_url'] ?? '/app/all-clients', is_ssl() ? 'https' : 'http')); ?>" class="btn btn-outline-primary btn-sm">
                         <i class="bi bi-plus-circle me-1"></i>
                         Add New Client
                     </a>
@@ -535,6 +535,20 @@ function deleteClient(clientId, clientName) {
                                                 <p class="fw-semibold mb-0" id="modalTown"></p>
                                             </td>
                                         </tr>
+                                        <!-- Suburb -->
+                                        <tr>
+                                            <td class="py-2">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="d-flex bg-secondary-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-signpost-split text-secondary" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">Suburb :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalSuburb"></p>
+                                            </td>
+                                        </tr>
                                         <!-- Street Address -->
                                         <tr>
                                             <td class="py-2">
@@ -582,6 +596,20 @@ function deleteClient(clientId, clientName) {
                                             </td>
                                             <td class="py-2">
                                                 <p class="fw-semibold mb-0" id="modalContactPerson"></p>
+                                            </td>
+                                        </tr>
+                                        <!-- Position -->
+                                        <tr>
+                                            <td class="py-2">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="d-flex bg-secondary-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
+                                                        <i class="bi bi-briefcase text-secondary" style="font-size: 12px;"></i>
+                                                    </div>
+                                                    <p class="fw-bold mb-0">Position :</p>
+                                                </div>
+                                            </td>
+                                            <td class="py-2">
+                                                <p class="fw-semibold mb-0" id="modalContactPosition"></p>
                                             </td>
                                         </tr>
                                         <!-- Email -->

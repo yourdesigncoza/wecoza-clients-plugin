@@ -227,6 +227,7 @@ class ClientsModel {
                 $row['contact_person_email'] = $contact['email'] ?? '';
                 $row['contact_person_cellphone'] = $contact['cellphone_number'] ?? '';
                 $row['contact_person_tel'] = $contact['tel_number'] ?? '';
+                $row['contact_person_position'] = $contact['position'] ?? '';
                 $row['contact_site_id'] = isset($contact['site_id']) ? (int) $contact['site_id'] : null;
             }
 

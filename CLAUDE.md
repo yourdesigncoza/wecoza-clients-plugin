@@ -78,9 +78,24 @@ DatabaseService::update($table, $data, $where, $params);  // Returns affected ro
 ### Client Management Features
 
 #### Shortcodes
-- `[wecoza_capture_clients]` - Client creation/edit form with validation
-- `[wecoza_display_clients per_page="10" show_search="true"]` - Clients table with search/filters
+- `[wecoza_capture_clients]` - Client creation form with validation
+- `[wecoza_update_clients]` - Client update form (requires URL parameters `?mode=update&client_id=17`)
+- `[wecoza_display_clients per_page="10" show_search="true" edit_url="/app/all-clients" add_url="/app/all-clients"]` - Clients table with search/filters and configurable URLs
 - `[wecoza_display_single_client id="123"]` - Single client detailed view
+
+#### Update Form Usage
+The `[wecoza_update_clients]` shortcode creates a dedicated update form with:
+- **Update-specific UI**: "Update Mode" indicator, "Save Changes" button
+- **URL Parameter Detection**: Automatically detects `?mode=update&client_id=17`
+- **Pre-populated Fields**: All client data loaded and ready for editing
+- **Enhanced Validation**: Update-specific validation and error handling
+- **Cancel Functionality**: Cancel button returns to previous page
+
+**Example Implementation:**
+```php
+// Page with [wecoza_update_clients] shortcode
+// URL: /app/all-clients/?mode=update&client_id=17
+```
 
 #### JSONB Fields Usage
 The following fields store JSON arrays and require special handling:

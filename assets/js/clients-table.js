@@ -202,11 +202,13 @@
         // Location Information
         $('#modalProvince').text(client.client_province || 'N/A');
         $('#modalTown').text(client.client_town || 'N/A');
+        $('#modalSuburb').text(client.client_suburb || 'N/A');
         $('#modalStreetAddress').text(client.client_street_address || 'N/A');
         $('#modalPostalCode').text(client.client_postal_code || 'N/A');
         
         // Contact Information
         $('#modalContactPerson').text(client.contact_person || 'N/A');
+        $('#modalContactPosition').text(client.contact_person_position || 'N/A');
         if (client.contact_person_email) {
             $('#modalContactEmail').html(`<a href="mailto:${client.contact_person_email}" class="text-primary text-decoration-underline">${client.contact_person_email}</a>`);
         } else {

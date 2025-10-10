@@ -1,0 +1,447 @@
+<div class="wecoza-clients-form-container"><div class="wecoza-clients-feedback mt-3"></div>
+        
+        
+        
+    <form id="clients-form" class="needs-validation ydcoza-compact-form" novalidate="" method="POST" enctype="multipart/form-data">
+        
+        
+                    <input type="hidden" name="id" value="1">
+                
+        <!-- Basic Information -->
+        <div class="row">
+            <input type="hidden" name="head_site_id" value="">
+                    <div class="col-md-3">
+            <label for="client_name" class="form-label">
+                Client Name                                    <span class="text-danger">*</span>
+                            </label>
+            
+                    <input type="text" id="client_name" name="client_name" class="form-control form-control-sm" required="">
+                    
+                            <div class="invalid-feedback">
+                    Please provide client name.
+                </div>
+                <div class="valid-feedback">
+                    Looks good!
+                </div>
+                        
+                    </div>
+                <div class="col-md-3">
+            <label for="site_name" class="form-label">
+                Site Name                                    <span class="text-danger">*</span>
+                            </label>
+            
+                    <input type="text" id="site_name" name="site_name" class="form-control form-control-sm" required="">
+                    
+                            <div class="invalid-feedback">
+                    Please provide site name.
+                </div>
+                <div class="valid-feedback">
+                    Looks good!
+                </div>
+                        
+                    </div>
+                <div class="col-md-3">
+            <label for="company_registration_nr" class="form-label">
+                Company Registration Nr                                    <span class="text-danger">*</span>
+                            </label>
+            
+                    <input type="text" id="company_registration_nr" name="company_registration_nr" class="form-control form-control-sm" value="2020/123456/07" required="">
+                    
+                            <div class="invalid-feedback">
+                    Please provide company registration nr.
+                </div>
+                <div class="valid-feedback">
+                    Looks good!
+                </div>
+                        
+                    </div>
+                </div>
+        
+        <!-- Sub-Client Information -->
+        <div class="row mt-4">
+            <div class="col-3">
+                <div class="form-check mb-3">
+                    <input type="checkbox" class="form-check-input" id="is_sub_client" name="is_sub_client">
+                    <label class="form-check-label" for="is_sub_client">
+                        <strong>Is SubClient</strong><br>
+                        <small class="text-muted">Check if this client is a branch/subsidiary of another main client</small>
+                    </label>
+                </div>
+            </div>
+            <div class="col-3">
+                <div id="main_client_dropdown_container" style="display: block;">
+                            <div class="js-main-client-field">
+            <label for="main_client_id" class="form-label">
+                Main Client                                    <span class="text-danger">*</span>
+                            </label>
+            
+                    <select id="main_client_id" name="main_client_id" class="js-main-client-select form-select form-select-sm" required="required">
+            <option value="">Select</option>
+                                                <option value="" selected="selected">
+                        Select Main Client...                    </option>
+                                                                <option value="5">
+                        AgriGrow Farms (2021/579135/07)                    </option>
+                                                                <option value="10">
+                        ConstructBuild Ltd (2017/369258/07)                    </option>
+                                                                <option value="2">
+                        EduLearn Academy (2018/987654/07)                    </option>
+                                                                <option value="4">
+                        FinanceFirst Corp (2017/135790/07)                    </option>
+                                                                <option value="9">
+                        GreenEnergy Solutions (2020/852741/07)                    </option>
+                                                                <option value="6">
+                        HealthCare Plus (2016/864209/07)                    </option>
+                                                                <option value="3">
+                        IndustrialTech Ltd (2019/246810/07)                    </option>
+                                                                <option value="8">
+                        LogisticsMaster (2019/159753/07)                    </option>
+                                                                <option value="7">
+                        MiningPro Resources (2015/753951/07)                    </option>
+                                                                <option value="11">
+                        RetailPro Stores (2018/147258/07)                    </option>
+                                                                <option value="19">
+                        Sannie S3 (457457547)                    </option>
+                                                                <option value="1">
+                        TechCorp Solutions (2020/123456/07)                    </option>
+                                    </select>
+                    
+                            <div class="invalid-feedback">
+                    Please provide main client.
+                </div>
+                <div class="valid-feedback">
+                    Looks good!
+                </div>
+                        
+                    </div>
+                        </div>
+            </div>
+        </div>
+        
+
+        <div class="border-top border-opacity-25 border-3 border-discovery my-5 mx-1"></div>
+        
+        <!-- Address Information -->
+        <div class="row">
+            <p class="text-muted">The correct address should already be registered in the Locations table. If not, please add it there first.</p>
+
+                    <div class="col-md-3 js-province-field">
+            <label for="client_province" class="form-label">
+                Province                                    <span class="text-danger">*</span>
+                            </label>
+            
+                    <select id="client_province" name="client_province" class="js-province-select form-select form-select-sm" required="">
+            <option value="">Select</option>
+                                                
+                                                                
+                                                                
+                                                                
+                                                                
+                                                                
+                                                                
+                                                                
+                                    <option value="Eastern Cape">Eastern Cape</option><option value="Free State">Free State</option><option value="Gauteng">Gauteng</option><option value="KwaZulu-Natal">KwaZulu-Natal</option><option value="Limpopo">Limpopo</option><option value="Mpumalanga">Mpumalanga</option><option value="Northern Cape">Northern Cape</option><option value="Western Cape">Western Cape</option></select>
+                    
+                            <div class="invalid-feedback">
+                    Please provide province.
+                </div>
+                <div class="valid-feedback">
+                    Looks good!
+                </div>
+                        
+                    </div>
+                <div class="col-md-3 js-town-field">
+            <label for="client_town" class="form-label">
+                Town                                    <span class="text-danger">*</span>
+                            </label>
+            
+                    <select id="client_town" name="client_town" class="js-town-select form-select form-select-sm" required="required">
+            <option value="">Select</option>
+                    <option value="Cape Town">Cape Town</option><option value="Garden Route District Municipality">Garden Route District Municipality</option><option value="Paarl">Paarl</option><option value="Stellenbosch">Stellenbosch</option></select>
+                    
+                            <div class="invalid-feedback">
+                    Please provide town.
+                </div>
+                <div class="valid-feedback">
+                    Looks good!
+                </div>
+                        
+                    </div>
+                <div class="col-md-3 js-suburb-field">
+            <label for="client_town_id" class="form-label">
+                Suburb                                    <span class="text-danger">*</span>
+                            </label>
+            
+                    <select id="client_town_id" name="client_town_id" class="js-suburb-select form-select form-select-sm" required="required">
+            <option value="">Select</option>
+                    <option value="16">Mossel Bay - 97 Klipper Street</option><option value="17">Mossel Bay - 45 Klipper Street</option></select>
+                    
+                            <div class="invalid-feedback">
+                    Please provide suburb.
+                </div>
+                <div class="valid-feedback">
+                    Looks good!
+                </div>
+                        
+                    </div>
+                <div class="col-md-3 js-postal-field">
+            <label for="client_postal_code" class="form-label">
+                Client Postal Code                                    <span class="text-danger">*</span>
+                            </label>
+            
+                    <input type="text" id="client_postal_code" name="client_postal_code" class="form-control form-control-sm" value="" readonly="" required="required">
+                    
+                            <div class="invalid-feedback">
+                    Please provide client postal code.
+                </div>
+                <div class="valid-feedback">
+                    Looks good!
+                </div>
+                        
+                    </div>
+                </div>
+
+        <input type="hidden" name="client_suburb" value="Mossel Bay" class="js-suburb-hidden">
+        <input type="hidden" name="client_town_name" value="Garden Route District Municipality" class="js-town-hidden">
+
+        <div class="row mt-3">
+                    <div class="col-md-3 js-address-field js-street-address-field">
+            <label for="client_street_address" class="form-label">
+                Client Street Address                                    <span class="text-danger">*</span>
+                            </label>
+            
+                    <input type="text" id="client_street_address" name="client_street_address" class="form-control form-control-sm" value="" readonly="" title="Address auto-populated from location data" required="required">
+                    
+                            <div class="invalid-feedback">
+                    Please provide client street address.
+                </div>
+                <div class="valid-feedback">
+                    Looks good!
+                </div>
+                        
+                    </div>
+                <div class="col-md-3 js-address-2-field">
+            <label for="client_address_line_2" class="form-label">
+                Address Line 2                            </label>
+            
+                    <input type="text" id="client_address_line_2" name="client_address_line_2" class="form-control form-control-sm" value="" readonly="" title="Address line 2 is managed by location system">
+                    
+                            <div class="invalid-feedback">
+                    Please provide address line 2.
+                </div>
+                <div class="valid-feedback">
+                    Looks good!
+                </div>
+                        
+                    </div>
+                </div>
+        
+        <div class="border-top border-opacity-25 border-3 border-discovery my-5 mx-1"></div>
+        
+        <!-- Contact Information -->
+        <div class="row">
+                    <div class="col-md-3">
+            <label for="contact_person" class="form-label">
+                Contact Person                                    <span class="text-danger">*</span>
+                            </label>
+            
+                    <input type="text" id="contact_person" name="contact_person" class="form-control form-control-sm" value="" required="">
+                    
+                            <div class="invalid-feedback">
+                    Please provide contact person.
+                </div>
+                <div class="valid-feedback">
+                    Looks good!
+                </div>
+                        
+                    </div>
+                <div class="col-md-3">
+            <label for="contact_person_email" class="form-label">
+                Contact Person Email                                    <span class="text-danger">*</span>
+                            </label>
+            
+                    <input type="email" id="contact_person_email" name="contact_person_email" class="form-control form-control-sm" value="" required="">
+                    
+                            <div class="invalid-feedback">
+                    Please provide contact person email.
+                </div>
+                <div class="valid-feedback">
+                    Looks good!
+                </div>
+                        
+                    </div>
+                <div class="col-md-3">
+            <label for="contact_person_cellphone" class="form-label">
+                Contact Person Cellphone                                    <span class="text-danger">*</span>
+                            </label>
+            
+                    <input type="tel" id="contact_person_cellphone" name="contact_person_cellphone" class="form-control form-control-sm" value="" required="">
+                    
+                            <div class="invalid-feedback">
+                    Please provide contact person cellphone.
+                </div>
+                <div class="valid-feedback">
+                    Looks good!
+                </div>
+                        
+                    </div>
+                <div class="col-md-3">
+            <label for="contact_person_tel" class="form-label">
+                Contact Person Tel Number                            </label>
+            
+                    <input type="tel" id="contact_person_tel" name="contact_person_tel" class="form-control form-control-sm" value="">
+                    
+                            <div class="invalid-feedback">
+                    Please provide contact person tel number.
+                </div>
+                <div class="valid-feedback">
+                    Looks good!
+                </div>
+                        
+                    </div>
+                <div class="col-md-3">
+            <label for="contact_person_position" class="form-label">
+                Contact Person Position                            </label>
+            
+                    <input type="text" id="contact_person_position" name="contact_person_position" class="form-control form-control-sm" value="">
+                    
+                            <div class="invalid-feedback">
+                    Please provide contact person position.
+                </div>
+                <div class="valid-feedback">
+                    Looks good!
+                </div>
+                        
+                    </div>
+                </div>
+        
+        <div class="border-top border-opacity-25 border-3 border-discovery my-5 mx-1"></div>
+        
+        <!-- Business Information -->
+        
+        
+        <div class="row mt-3">
+                    <div class="col-md-3">
+            <label for="seta" class="form-label">
+                SETA                                    <span class="text-danger">*</span>
+                            </label>
+            
+                    <select id="seta" name="seta" class="form-control form-control-sm form-select form-select-sm" required="">
+            <option value="">Select</option>
+                                                <option value="AgriSETA">
+                        AgriSETA                    </option>
+                                                                <option value="BANKSETA">
+                        BANKSETA                    </option>
+                                                                <option value="CATHSSETA">
+                        CATHSSETA                    </option>
+                                                                <option value="CETA">
+                        CETA                    </option>
+                                                                <option value="CHIETA">
+                        CHIETA                    </option>
+                                                                <option value="ETDP SETA">
+                        ETDP SETA                    </option>
+                                                                <option value="EWSETA">
+                        EWSETA                    </option>
+                                                                <option value="FASSET">
+                        FASSET                    </option>
+                                                                <option value="FP&amp;M SETA">
+                        FP&amp;M SETA                    </option>
+                                                                <option value="FoodBev SETA">
+                        FoodBev SETA                    </option>
+                                                                <option value="HWSETA">
+                        HWSETA                    </option>
+                                                                <option value="INSETA">
+                        INSETA                    </option>
+                                                                <option value="LGSETA">
+                        LGSETA                    </option>
+                                                                <option value="MICT SETA">
+                        MICT SETA                    </option>
+                                                                <option value="MQA">
+                        MQA                    </option>
+                                                                <option value="PSETA">
+                        PSETA                    </option>
+                                                                <option value="SASSETA">
+                        SASSETA                    </option>
+                                                                <option value="Services SETA">
+                        Services SETA                    </option>
+                                                                <option value="TETA">
+                        TETA                    </option>
+                                                                <option value="W&amp;RSETA">
+                        W&amp;RSETA                    </option>
+                                                                <option value="merSETA">
+                        merSETA                    </option>
+                                    </select>
+                    
+                            <div class="invalid-feedback">
+                    Please provide seta.
+                </div>
+                <div class="valid-feedback">
+                    Looks good!
+                </div>
+                        
+                    </div>
+                <div class="col-md-3">
+            <label for="client_status" class="form-label">
+                Client Status                                    <span class="text-danger">*</span>
+                            </label>
+            
+                    <select id="client_status" name="client_status" class="form-control form-control-sm form-select form-select-sm" required="">
+            <option value="">Select</option>
+                                                <option value="Cold Call">
+                        Cold Call                    </option>
+                                                                <option value="Lead">
+                        Lead                    </option>
+                                                                <option value="Active Client">
+                        Active Client                    </option>
+                                                                <option value="Lost Client">
+                        Lost Client                    </option>
+                                    </select>
+                    
+                            <div class="invalid-feedback">
+                    Please provide client status.
+                </div>
+                <div class="valid-feedback">
+                    Looks good!
+                </div>
+                        
+                    </div>
+                <div class="col-md-3">
+            <label for="financial_year_end" class="form-label">
+                Financial Year End                                    <span class="text-danger">*</span>
+                            </label>
+            
+                    <input type="date" id="financial_year_end" name="financial_year_end" class="form-control form-control-sm" value="" required="">
+                    
+                            <div class="invalid-feedback">
+                    Please provide financial year end.
+                </div>
+                <div class="valid-feedback">
+                    Looks good!
+                </div>
+                        
+                    </div>
+                <div class="col-md-3">
+            <label for="bbbee_verification_date" class="form-label">
+                BBBEE Verification Date                                    <span class="text-danger">*</span>
+                            </label>
+            
+                    <input type="date" id="bbbee_verification_date" name="bbbee_verification_date" class="form-control form-control-sm" value="" required="">
+                    
+                            <div class="invalid-feedback">
+                    Please provide bbbee verification date.
+                </div>
+                <div class="valid-feedback">
+                    Looks good!
+                </div>
+                        
+                    </div>
+                </div>
+        
+        <div class="border-top border-opacity-25 border-3 border-discovery my-5 mx-1"></div>
+        
+        <!-- Submit Button -->
+        <div class="col-md-3">
+            <button type="submit" class="btn btn-subtle-primary mt-3">
+                Update Client            </button>
+        </div>
+    </form>
+</div>
