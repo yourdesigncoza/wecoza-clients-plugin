@@ -279,7 +279,7 @@ class SitesModel {
             $params[$key] = $id;
         }
 
-        $sql = 'SELECT s.site_id, s.client_id, s.site_name, s.address_line_1, s.address_line_2, s.address, s.place_id, s.created_at, s.updated_at
+        $sql = 'SELECT s.site_id, s.client_id, s.site_name, s.place_id, s.parent_site_id, s.created_at, s.updated_at
                 FROM ' . $this->table . ' s
                 WHERE s.parent_site_id IS NULL AND s.client_id IN (' . implode(', ', $placeholders) . ')
                 ORDER BY s.client_id, s.site_id';
@@ -376,7 +376,7 @@ class SitesModel {
             return array('head' => null, 'sub_sites' => array());
         }
 
-        $sql = 'SELECT site_id, client_id, site_name, address_line_1, address_line_2, address, place_id, parent_site_id, created_at, updated_at
+        $sql = 'SELECT site_id, client_id, site_name, place_id, parent_site_id, created_at, updated_at
                 FROM ' . $this->table . '
                 WHERE client_id = :client_id
                 ORDER BY parent_site_id NULLS FIRST, site_id';
@@ -414,17 +414,11 @@ class SitesModel {
 
         $payload = $this->filterSitePayload($data);
         $payload['client_id'] = $clientId;
-        $payload['parent_site_id'] = null;
+        $payload['parent_site_id'] = null; // Head sites always have null parent
         $payload['updated_at'] = current_time('mysql');
 
         if (empty($payload['site_name'])) {
             $payload['site_name'] = $data['site_name_fallback'] ?? ('Client ' . $clientId);
-        }
-
-        if (!empty($payload['address_line_1']) && !empty($payload['address_line_2'])) {
-            $payload['address'] = $payload['address_line_1'] . ' ' . $payload['address_line_2'];
-        } elseif (!empty($payload['address_line_1'])) {
-            $payload['address'] = $payload['address_line_1'];
         }
 
         if ($siteId > 0) {
@@ -456,21 +450,16 @@ class SitesModel {
         $errors = array();
 
         $name = trim((string) ($data['site_name'] ?? ''));
-        $address1 = trim((string) ($data['address_line_1'] ?? ''));
         $placeId = isset($data['place_id']) ? (int) $data['place_id'] : 0;
 
         if ($name === '') {
             $errors['site_name'] = __('Site name is required.', 'wecoza-clients');
         }
 
-        if ($address1 === '') {
-            $errors['address_line_1'] = __('Site address line 1 is required.', 'wecoza-clients');
-        }
-
         if ($placeId <= 0) {
-            $errors['place_id'] = __('Please select a valid suburb for the site.', 'wecoza-clients');
+            $errors['place_id'] = __('Please select a valid location for the site.', 'wecoza-clients');
         } elseif (!$this->locationsAvailable() || !$this->getLocationById($placeId)) {
-            $errors['place_id'] = __('Selected suburb could not be resolved. Please choose another.', 'wecoza-clients');
+            $errors['place_id'] = __('Selected location could not be resolved. Please choose another.', 'wecoza-clients');
         }
 
         return $errors;
@@ -482,7 +471,7 @@ class SitesModel {
             return null;
         }
 
-        $sql = 'SELECT site_id, client_id, site_name, address_line_1, address_line_2, address, place_id, parent_site_id, created_at, updated_at
+        $sql = 'SELECT site_id, client_id, site_name, place_id, parent_site_id, created_at, updated_at
                 FROM ' . $this->table . '
                 WHERE site_id = :id
                 LIMIT 1';
@@ -535,8 +524,8 @@ class SitesModel {
             $row['head_site'] = $site;
             $row['site_id'] = $site['site_id'];
             $row['site_name'] = $site['site_name'];
-            $row['client_street_address'] = $site['address_line_1'];
-            $row['client_address_line_2'] = $site['address_line_2'];
+            $row['client_street_address'] = $site['address_line_1'] ?? '';
+            $row['client_address_line_2'] = $site['address_line_2'] ?? '';
             $row['client_town_id'] = $site['place_id'];
             if (!empty($site['location'])) {
                 $location = $site['location'];
@@ -555,13 +544,13 @@ class SitesModel {
     }
 
     protected function filterSitePayload(array $data) {
-        $allowed = array('site_name', 'address_line_1', 'address_line_2', 'address', 'place_id');
+        $allowed = array('site_name', 'place_id', 'parent_site_id');
         $result = array();
 
         foreach ($allowed as $field) {
             if (array_key_exists($field, $data)) {
                 $value = $data[$field];
-                if ($field === 'place_id') {
+                if ($field === 'place_id' || $field === 'parent_site_id') {
                     $value = $value ? (int) $value : null;
                 }
                 $result[$field] = $value === '' ? null : $value;
@@ -664,5 +653,206 @@ class SitesModel {
         }
 
         return $locations;
+    }
+
+    /**
+     * Save a sub-site under a parent site
+     */
+    public function saveSubSite($clientId, $parentSiteId, array $data, array $options = array()) {
+        $clientId = (int) $clientId;
+        $parentSiteId = (int) $parentSiteId;
+        
+        if ($clientId <= 0 || $parentSiteId <= 0) {
+            return false;
+        }
+
+        // Verify parent site exists and belongs to same client
+        $parentSite = $this->getSiteById($parentSiteId);
+        if (!$parentSite || !empty($parentSite['parent_site_id'])) {
+            return false;
+        }
+
+        $expectedClientId = isset($options['expected_client_id']) ? (int) $options['expected_client_id'] : null;
+        $allowFallback = !empty($options['fallback_to_head_site']);
+
+        $parentClientId = isset($parentSite['client_id']) ? (int) $parentSite['client_id'] : 0;
+        if ($parentClientId !== $clientId) {
+            if (!($allowFallback && $expectedClientId && $parentClientId === $expectedClientId)) {
+                return false;
+            }
+
+            $headPayload = $data;
+            unset($headPayload['parent_site_id']);
+
+            $headSiteId = $this->saveHeadSite($clientId, $headPayload);
+            if (!$headSiteId) {
+                return false;
+            }
+
+            return array(
+                'site_id' => (int) $headSiteId,
+                'mode' => 'head',
+            );
+        }
+
+        $siteId = isset($data['site_id']) ? (int) $data['site_id'] : 0;
+
+        $payload = $this->filterSitePayload($data);
+        $payload['client_id'] = $clientId;
+        $payload['parent_site_id'] = $parentSiteId;
+        $payload['updated_at'] = current_time('mysql');
+
+        if (empty($payload['site_name'])) {
+            $payload['site_name'] = $data['site_name_fallback'] ?? ('Sub-site of ' . $parentSite['site_name']);
+        }
+
+        if ($siteId > 0) {
+            // Verify the sub-site belongs to the same parent
+            $existing = $this->getSiteById($siteId);
+            if (!$existing || (int) $existing['parent_site_id'] !== $parentSiteId) {
+                return false;
+            }
+
+            $where = $this->primaryKey . ' = :id AND parent_site_id = :parent_site_id';
+            $params = array(':id' => $siteId, ':parent_site_id' => $parentSiteId);
+            $result = DatabaseService::update($this->table, $payload, $where, $params);
+            if ($result === false) {
+                return false;
+            }
+
+            return array(
+                'site_id' => $siteId,
+                'mode' => 'sub',
+            );
+        }
+
+        $payload['created_at'] = current_time('mysql');
+        $insert = DatabaseService::insert($this->table, $payload);
+        if (!$insert) {
+            return false;
+        }
+
+        return array(
+            'site_id' => (int) $insert,
+            'mode' => 'sub',
+        );
+    }
+
+    /**
+     * Validate sub-site data
+     */
+    public function validateSubSite($clientId, $parentSiteId, array $data, $expectedClientId = null) {
+        $errors = array();
+
+        $name = trim((string) ($data['site_name'] ?? ''));
+        $placeId = isset($data['place_id']) ? (int) $data['place_id'] : 0;
+
+        if ($name === '') {
+            $errors['site_name'] = __('Site name is required.', 'wecoza-clients');
+        }
+
+        if ($placeId <= 0) {
+            $errors['place_id'] = __('Please select a valid location for the site.', 'wecoza-clients');
+        } elseif (!$this->locationsAvailable() || !$this->getLocationById($placeId)) {
+            $errors['place_id'] = __('Selected location could not be resolved. Please choose another.', 'wecoza-clients');
+        }
+
+        // Validate parent site - use expected client ID if provided, otherwise use current client ID
+        $validationClientId = $expectedClientId !== null ? (int) $expectedClientId : (int) $clientId;
+        $parentSite = $this->getSiteById($parentSiteId);
+        
+        if (!$parentSite || (int) $parentSite['client_id'] !== $validationClientId || !empty($parentSite['parent_site_id'])) {
+            $errors['parent_site_id'] = __('Invalid parent site selected.', 'wecoza-clients');
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Get head sites for a client (for parent site selection)
+     */
+    public function getHeadSitesForClient($clientId) {
+        $clientId = (int) $clientId;
+        if ($clientId <= 0) {
+            return array();
+        }
+
+        $sql = 'SELECT site_id, site_name, place_id, created_at
+                FROM ' . $this->table . '
+                WHERE client_id = :client_id AND parent_site_id IS NULL
+                ORDER BY site_name';
+        
+        $sites = DatabaseService::getAll($sql, array(':client_id' => $clientId));
+        return $sites ? $this->hydrateLocationForSites($sites) : array();
+    }
+
+    /**
+     * Get sub-sites for a parent site
+     */
+    public function getSubSites($parentSiteId) {
+        $parentSiteId = (int) $parentSiteId;
+        if ($parentSiteId <= 0) {
+            return array();
+        }
+
+        $sql = 'SELECT site_id, client_id, site_name, place_id, created_at, updated_at
+                FROM ' . $this->table . '
+                WHERE parent_site_id = :parent_site_id
+                ORDER BY site_name';
+        
+        $sites = DatabaseService::getAll($sql, array(':parent_site_id' => $parentSiteId));
+        return $sites ? $this->hydrateLocationForSites($sites) : array();
+    }
+
+    /**
+     * Get all sites for a client with hierarchy
+     */
+    public function getAllSitesWithHierarchy($clientId) {
+        $sites = $this->getSitesForClient($clientId);
+        
+        $head = null;
+        $subSites = array();
+        
+        foreach ($sites as $site) {
+            if (empty($site['parent_site_id'])) {
+                $head = $site;
+            } else {
+                $subSites[] = $site;
+            }
+        }
+
+        return array(
+            'head_sites' => $head ? array($head) : array(),
+            'sub_sites' => $subSites
+        );
+    }
+
+    /**
+     * Delete a sub-site
+     */
+    public function deleteSubSite($siteId, $clientId) {
+        $siteId = (int) $siteId;
+        $clientId = (int) $clientId;
+        
+        if ($siteId <= 0 || $clientId <= 0) {
+            return false;
+        }
+
+        // Verify it's a sub-site belonging to the client
+        $site = $this->getSiteById($siteId);
+        if (!$site || (int) $site['client_id'] !== $clientId || empty($site['parent_site_id'])) {
+            return false;
+        }
+
+        // Check if this site has any children (prevent deletion)
+        $sql = 'SELECT COUNT(*) as child_count FROM ' . $this->table . ' WHERE parent_site_id = :site_id';
+        $result = DatabaseService::getRow($sql, array(':site_id' => $siteId));
+        
+        if ($result && (int) $result['child_count'] > 0) {
+            return false; // Cannot delete site with children
+        }
+
+        $sql = 'DELETE FROM ' . $this->table . ' WHERE site_id = :site_id AND client_id = :client_id';
+        return DatabaseService::delete($sql, array(':site_id' => $siteId, ':client_id' => $clientId)) !== false;
     }
 }

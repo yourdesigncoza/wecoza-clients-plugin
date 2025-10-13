@@ -200,22 +200,10 @@ return array(
             'required' => true,
             'max_length' => 50,
         ),
-        'client_province' => array(
-            'required' => true,
-            'max_length' => 50,
-        ),
-        'client_suburb' => array(
-            'required' => true,
-            'max_length' => 255,
-        ),
         'client_town_id' => array(
             'required' => true,
             'integer' => true,
             'min' => 1,
-        ),
-        'client_postal_code' => array(
-            'required' => true,
-            'max_length' => 20,
         ),
         'contact_person' => array(
             'required' => true,

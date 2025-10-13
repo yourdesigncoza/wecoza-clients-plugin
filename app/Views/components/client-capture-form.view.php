@@ -135,15 +135,6 @@ $is_edit = !empty($client['id']);
                 )
             );
             
-            echo ViewHelpers::renderField('text', 'site_name', 'Site Name', 
-                $headSiteName, 
-                array(
-                    'required' => true,
-                    'col_class' => 'col-md-3',
-                    'error' => $errors['site_name'] ?? ''
-                )
-            );
-            
             echo ViewHelpers::renderField('text', 'company_registration_nr', 'Company Registration Nr', 
                 $client['company_registration_nr'] ?? '', 
                 array(
@@ -153,6 +144,22 @@ $is_edit = !empty($client['id']);
                 )
             );
             ?>
+        </div>
+        
+        <!-- Site Information -->
+        <div class="row mt-3">
+            <div class="col-3">
+                <?php
+                echo ViewHelpers::renderField('text', 'site_name', 'Site Name', 
+                    $headSiteName, 
+                    array(
+                        'required' => true,
+                        'col_class' => '',
+                        'error' => $errors['site_name'] ?? ''
+                    )
+                );
+                ?>
+            </div>
         </div>
         
         <!-- Sub-Client Information -->
@@ -440,5 +447,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     }
+
 });
 </script>

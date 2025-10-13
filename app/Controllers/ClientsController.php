@@ -56,14 +56,7 @@ class ClientsController {
         return $this->getModel()->getSitesModel();
     }
 
-    /**
-     * Get contacts model instance
-     *
-     * @return \WeCozaClients\Models\ClientContactsModel
-     */
-    protected function getContactsModel() {
-        return $this->getModel()->getContactsModel();
-    }
+
     
     /**
      * Register shortcodes
@@ -280,12 +273,8 @@ class ClientsController {
             if (!empty($submittedSite['place_id'])) {
                 $client['client_town_id'] = $submittedSite['place_id'];
             }
-            if (!empty($submittedSite['address_line_1'])) {
-                $client['client_street_address'] = $submittedSite['address_line_1'];
-            }
-            if (!empty($submittedSite['address_line_2'])) {
-                $client['client_address_line_2'] = $submittedSite['address_line_2'];
-            }
+            // Address fields are stored in locations table and retrieved via SitesModel hydration
+            // No need to store address fields directly in clients table
             if (!empty($submittedSite['site_name'])) {
                 $client['site_name'] = $submittedSite['site_name'];
             }
@@ -434,57 +423,9 @@ class ClientsController {
             return '<p>' . __('Client not found.', 'wecoza-clients') . '</p>';
         }
 
-        // Merge primary contact information to ensure form population
-        $contactDefaults = array(
-            'name' => $client['contact_person'] ?? '',
-            'email' => $client['contact_person_email'] ?? '',
-            'cellphone' => $client['contact_person_cellphone'] ?? '',
-            'telephone' => $client['contact_person_tel'] ?? '',
-            'position' => $client['contact_person_position'] ?? '',
-            'site_id' => $client['contact_site_id'] ?? null,
-        );
 
-        $primaryContact = $this->getContactsModel()->getPrimaryContact($clientId);
-        if (is_array($primaryContact)) {
-            $contactNameParts = array_filter(array(
-                $primaryContact['first_name'] ?? '',
-                $primaryContact['surname'] ?? '',
-            ));
 
-            $resolvedName = trim(implode(' ', $contactNameParts));
 
-            if ($resolvedName === '' && !empty($primaryContact['email'])) {
-                $resolvedName = $primaryContact['email'];
-            }
-
-            $contactDefaults = array(
-                'name' => $resolvedName,
-                'email' => $primaryContact['email'] ?? '',
-                'cellphone' => $primaryContact['cellphone_number'] ?? '',
-                'telephone' => $primaryContact['tel_number'] ?? '',
-                'position' => $primaryContact['position'] ?? '',
-                'site_id' => !empty($primaryContact['site_id']) ? (int) $primaryContact['site_id'] : null,
-            );
-
-            if (empty($client['contact_person'])) {
-                $client['contact_person'] = $contactDefaults['name'];
-            }
-            if (empty($client['contact_person_email'])) {
-                $client['contact_person_email'] = $contactDefaults['email'];
-            }
-            if (empty($client['contact_person_cellphone'])) {
-                $client['contact_person_cellphone'] = $contactDefaults['cellphone'];
-            }
-            if (empty($client['contact_person_tel'])) {
-                $client['contact_person_tel'] = $contactDefaults['telephone'];
-            }
-            if (empty($client['contact_person_position'])) {
-                $client['contact_person_position'] = $contactDefaults['position'];
-            }
-            if (empty($client['contact_site_id']) && $contactDefaults['site_id']) {
-                $client['contact_site_id'] = $contactDefaults['site_id'];
-            }
-        }
         
         // Filter client data to only include known safe scalar fields
         $client = $this->filterClientDataForForm($client);
@@ -529,12 +470,8 @@ class ClientsController {
             if (!empty($submittedSite['place_id'])) {
                 $client['client_town_id'] = $submittedSite['place_id'];
             }
-            if (!empty($submittedSite['address_line_1'])) {
-                $client['client_street_address'] = $submittedSite['address_line_1'];
-            }
-            if (!empty($submittedSite['address_line_2'])) {
-                $client['client_address_line_2'] = $submittedSite['address_line_2'];
-            }
+            // Address fields are stored in locations table and retrieved via SitesModel hydration
+            // No need to store address fields directly in clients table
             if (!empty($submittedSite['site_name'])) {
                 $client['site_name'] = $submittedSite['site_name'];
             }
@@ -580,7 +517,6 @@ class ClientsController {
             'location_data' => $locationData,
             'sites' => $sitesData,
             'main_clients' => $main_clients,
-            'contact_defaults' => $contactDefaults,
             'is_update_mode' => true,
         ));
     }
@@ -595,25 +531,30 @@ class ClientsController {
         $payload = $this->sanitizeFormData($_POST);
         $clientData = $payload['client'];
         $siteData = $payload['site'];
-        $contactData = $payload['contact'];
         $communicationType = $clientData['client_status'] ?? '';
         $isNew = ((int) $clientId) <= 0;
 
         $errors = $this->getModel()->validate($clientData, $clientId);
-        $siteErrors = $this->getSitesModel()->validateHeadSite($siteData);
+        
+        // Validate site based on type
+        if (!empty($siteData['parent_site_id'])) {
+            // This is a sub-site - for new sub-clients, validate parent site belongs to main client
+            $expectedClientId = null;
+            if ($isNew && !empty($clientData['main_client_id'])) {
+                // For new sub-clients, parent site should belong to the main client
+                $expectedClientId = $clientData['main_client_id'];
+            }
+            $siteErrors = $this->getSitesModel()->validateSubSite($clientId, $siteData['parent_site_id'], $siteData, $expectedClientId);
+        } else {
+            // This is a head site
+            $siteErrors = $this->getSitesModel()->validateHeadSite($siteData);
+        }
 
         if ($siteErrors) {
             foreach ($siteErrors as $field => $message) {
                 switch ($field) {
                     case 'site_name':
                         $errors['site_name'] = $message;
-                        break;
-                    case 'address_line_1':
-                        $errors['site_address_line_1'] = $message;
-                        $errors['client_street_address'] = $message;
-                        break;
-                    case 'address_line_2':
-                        $errors['site_address_line_2'] = $message;
                         break;
                     case 'place_id':
                         $errors['client_town_id'] = $message;
@@ -675,23 +616,63 @@ class ClientsController {
             );
         }
 
-        $siteId = $this->getSitesModel()->saveHeadSite($clientId, $siteData);
-        if (!$siteId) {
-            return array(
-                'success' => false,
-                'errors' => array('general' => __('Failed to save site details. Please try again.', 'wecoza-clients')),
-                'data' => array(
-                    'client' => $clientData,
-                    'site' => $siteData,
-                ),
+        // Save site based on type (head site or sub-site)
+        if (!empty($siteData['parent_site_id'])) {
+            // This is a sub-site
+            $saveOptions = array(
+                'fallback_to_head_site' => true,
             );
+            if (!empty($expectedClientId)) {
+                $saveOptions['expected_client_id'] = (int) $expectedClientId;
+            }
+
+            $subSiteResult = $this->getSitesModel()->saveSubSite($clientId, $siteData['parent_site_id'], $siteData, $saveOptions);
+            if (!$subSiteResult) {
+                return array(
+                    'success' => false,
+                    'errors' => array('general' => __('Failed to save sub-site details. Please try again.', 'wecoza-clients')),
+                    'data' => array(
+                        'client' => $clientData,
+                        'site' => $siteData,
+                    ),
+                );
+            }
+
+            if (is_array($subSiteResult)) {
+                $siteId = isset($subSiteResult['site_id']) ? (int) $subSiteResult['site_id'] : 0;
+                if (($subSiteResult['mode'] ?? '') === 'head') {
+                    $siteData['parent_site_id'] = null;
+                }
+            } else {
+                $siteId = (int) $subSiteResult;
+            }
+
+            if ($siteId <= 0) {
+                return array(
+                    'success' => false,
+                    'errors' => array('general' => __('Failed to save sub-site details. Please try again.', 'wecoza-clients')),
+                    'data' => array(
+                        'client' => $clientData,
+                        'site' => $siteData,
+                    ),
+                );
+            }
+        } else {
+            // This is a head site
+            $siteId = $this->getSitesModel()->saveHeadSite($clientId, $siteData);
+            if (!$siteId) {
+                return array(
+                    'success' => false,
+                    'errors' => array('general' => __('Failed to save site details. Please try again.', 'wecoza-clients')),
+                    'data' => array(
+                        'client' => $clientData,
+                        'site' => $siteData,
+                    ),
+                );
+            }
         }
 
-        $contactModel = $this->getModel()->getContactsModel();
-        if (!empty($contactData['email']) || !empty($contactData['cellphone']) || !empty($contactData['telephone']) || !empty($contactData['name'])) {
-            $contactData['site_id'] = $siteId;
-            $contactModel->upsertPrimaryContact($clientId, $contactData);
-        }
+
 
         if ($communicationType !== '') {
             $communicationsModel = $this->getModel()->getCommunicationsModel();
@@ -737,57 +718,46 @@ class ClientsController {
             $client['main_client_id'] = null;
         }
 
+        // Contact person fields now go directly into client array (consolidated approach)
         $client['contact_person'] = isset($data['contact_person']) ? sanitize_text_field($data['contact_person']) : '';
         $client['contact_person_email'] = isset($data['contact_person_email']) ? sanitize_email($data['contact_person_email']) : '';
         $client['contact_person_cellphone'] = isset($data['contact_person_cellphone']) ? sanitize_text_field($data['contact_person_cellphone']) : '';
         $client['contact_person_tel'] = isset($data['contact_person_tel']) ? sanitize_text_field($data['contact_person_tel']) : '';
         $client['contact_person_position'] = isset($data['contact_person_position']) ? sanitize_text_field($data['contact_person_position']) : '';
 
-        $client['client_suburb'] = isset($data['client_suburb']) ? sanitize_text_field($data['client_suburb']) : '';
-        $client['client_postal_code'] = isset($data['client_postal_code']) ? sanitize_text_field($data['client_postal_code']) : '';
-        $client['client_province'] = isset($data['client_province']) ? sanitize_text_field($data['client_province']) : '';
-        $client['client_town'] = isset($data['client_town_name']) ? sanitize_text_field($data['client_town_name']) : (isset($data['client_town']) ? sanitize_text_field($data['client_town']) : '');
-
+        // Only store the place_id reference in the clients table
+        // Location data will be retrieved via SitesModel hydration
         $placeId = isset($data['client_town_id']) ? (int) $data['client_town_id'] : 0;
         $client['client_town_id'] = $placeId;
+        
         // Initialize site array with default values
         $site = array(
             'site_id' => isset($data['head_site_id']) ? (int) $data['head_site_id'] : 0,
             'site_name' => isset($data['site_name']) ? sanitize_text_field($data['site_name']) : '',
-            'address_line_1' => isset($data['client_street_address']) ? sanitize_text_field($data['client_street_address']) : '',
-            'address_line_2' => isset($data['client_address_line_2']) ? sanitize_text_field($data['client_address_line_2']) : '',
             'place_id' => $placeId,
         );
+        
+        // Handle sub-client relationship - if this is a sub-client, link to main client's site
+        if (!empty($client['main_client_id'])) {
+            // This is a sub-client, get the main client's head site
+            $mainClientSite = $this->getSitesModel()->getHeadSite($client['main_client_id']);
+            if ($mainClientSite && !empty($mainClientSite['site_id'])) {
+                $site['parent_site_id'] = $mainClientSite['site_id'];
+            }
+        } else {
+            // This is a main client, create a head site
+            $site['parent_site_id'] = null;
+        }
 
         if ($placeId > 0) {
             $location = $this->getSitesModel()->getLocationById($placeId);
-            if ($location) {
-                // Override client data with location data
-                $client['client_suburb'] = $location['suburb'] ?? $client['client_suburb'];
-                $client['client_postal_code'] = $location['postal_code'] ?? $client['client_postal_code'];
-                $client['client_province'] = $location['province'] ?? $client['client_province'];
-                $client['client_town'] = $location['town'] ?? $client['client_town'];
-                
-                // Override site address with location street address
-                if (!empty($location['street_address'])) {
-                    $site['address_line_1'] = $location['street_address'];
-                    $site['address_line_2'] = ''; // Clear address line 2 since it's not in location data
-                }
-            }
+            // Address data will be retrieved via SitesModel hydration
+            // No need to store location fields directly in the clients table
         }
-
-        $contact = array(
-            'name' => $client['contact_person'],
-            'email' => $client['contact_person_email'],
-            'cellphone' => $client['contact_person_cellphone'],
-            'telephone' => $client['contact_person_tel'],
-            'position' => $client['contact_person_position'] ?? '',
-        );
 
         return array(
             'client' => $client,
             'site' => $site,
-            'contact' => $contact,
         );
     }
     
@@ -808,11 +778,10 @@ class ClientsController {
         $scalarFields = array(
             'id', 'client_name', 'company_registration_nr', 'seta', 'client_status',
             'financial_year_end', 'bbbee_verification_date', 'main_client_id',
+            'client_town_id', // Reference to place_id in locations table
             'created_at', 'updated_at',
             'contact_person', 'contact_person_email', 'contact_person_cellphone', 
             'contact_person_tel', 'contact_person_position',
-            'client_street_address', 'client_address_line_2', 'client_province', 
-            'client_town', 'client_suburb', 'client_postal_code', 'client_town_id',
         );
         
         foreach ($scalarFields as $field) {
@@ -835,32 +804,13 @@ class ClientsController {
             if (!empty($headSite['site_name']) && !isset($processed['site_name'])) {
                 $processed['site_name'] = $headSite['site_name'];
             }
-            if (!empty($headSite['address_line_1']) && !isset($processed['client_street_address'])) {
-                $processed['client_street_address'] = $headSite['address_line_1'];
-            }
-            if (!empty($headSite['address_line_2']) && !isset($processed['client_address_line_2'])) {
-                $processed['client_address_line_2'] = $headSite['address_line_2'];
-            }
+            // Address fields removed - now get address from location data via place_id
             if (!empty($headSite['place_id']) && !isset($processed['client_town_id'])) {
                 $processed['client_town_id'] = $headSite['place_id'];
             }
             
-            // Extract location data from nested location array
-            if (!empty($headSite['location']) && is_array($headSite['location'])) {
-                $location = $headSite['location'];
-                if (!empty($location['province']) && !isset($processed['client_province'])) {
-                    $processed['client_province'] = $location['province'];
-                }
-                if (!empty($location['town']) && !isset($processed['client_town'])) {
-                    $processed['client_town'] = $location['town'];
-                }
-                if (!empty($location['suburb']) && !isset($processed['client_suburb'])) {
-                    $processed['client_suburb'] = $location['suburb'];
-                }
-                if (!empty($location['postal_code']) && !isset($processed['client_postal_code'])) {
-                    $processed['client_postal_code'] = $location['postal_code'];
-                }
-            }
+            // Location data will be hydrated by SitesModel from locations table
+            // No need to store location fields directly in clients table
         }
         
         // Keep client_location array if it exists and is properly structured
@@ -1172,5 +1122,130 @@ class ClientsController {
         $main_clients = $this->getModel()->getMainClients();
         
         wp_die(json_encode(array('success' => true, 'data' => $main_clients)));
+    }
+
+    /**
+     * AJAX handler to save a sub-site
+     */
+    public function ajaxSaveSubSite() {
+        check_ajax_referer('wecoza_clients_ajax', 'nonce');
+
+        if (!current_user_can('edit_wecoza_clients')) {
+            wp_die(json_encode(array('success' => false, 'message' => __('Permission denied.', 'wecoza-clients'))));
+        }
+
+        $clientId = isset($_POST['client_id']) ? (int) $_POST['client_id'] : 0;
+        $parentSiteId = isset($_POST['parent_site_id']) ? (int) $_POST['parent_site_id'] : 0;
+        $siteData = isset($_POST['site_data']) ? json_decode(stripslashes($_POST['site_data']), true) : array();
+
+        if ($clientId <= 0 || $parentSiteId <= 0 || empty($siteData)) {
+            wp_die(json_encode(array('success' => false, 'message' => __('Invalid request parameters.', 'wecoza-clients'))));
+        }
+
+        $errors = $this->getSitesModel()->validateSubSite($clientId, $parentSiteId, $siteData, $clientId);
+        if (!empty($errors)) {
+            wp_die(json_encode(array('success' => false, 'errors' => $errors)));
+        }
+
+        $saveResult = $this->getSitesModel()->saveSubSite($clientId, $parentSiteId, $siteData);
+        if (!$saveResult) {
+            wp_die(json_encode(array('success' => false, 'message' => __('Failed to save sub-site. Please try again.', 'wecoza-clients'))));
+        }
+
+        $siteId = is_array($saveResult) ? (int) ($saveResult['site_id'] ?? 0) : (int) $saveResult;
+        if ($siteId <= 0) {
+            wp_die(json_encode(array('success' => false, 'message' => __('Failed to save sub-site. Please try again.', 'wecoza-clients'))));
+        }
+
+        wp_die(json_encode(array(
+            'success' => true,
+            'message' => __('Sub-site saved successfully!', 'wecoza-clients'),
+            'data' => array('site_id' => $siteId)
+        )));
+    }
+
+    /**
+     * AJAX handler to get head sites for a client
+     */
+    public function ajaxGetHeadSites() {
+        check_ajax_referer('wecoza_clients_ajax', 'nonce');
+
+        if (!current_user_can('view_wecoza_clients')) {
+            wp_die(json_encode(array('success' => false, 'message' => __('Permission denied.', 'wecoza-clients'))));
+        }
+
+        $clientId = isset($_GET['client_id']) ? (int) $_GET['client_id'] : 0;
+        if ($clientId <= 0) {
+            wp_die(json_encode(array('success' => false, 'message' => __('Invalid client ID.', 'wecoza-clients'))));
+        }
+
+        $headSites = $this->getSitesModel()->getHeadSitesForClient($clientId);
+        wp_die(json_encode(array('success' => true, 'data' => $headSites)));
+    }
+
+    /**
+     * AJAX handler to get sub-sites for a parent site
+     */
+    public function ajaxGetSubSites() {
+        check_ajax_referer('wecoza_clients_ajax', 'nonce');
+
+        if (!current_user_can('view_wecoza_clients')) {
+            wp_die(json_encode(array('success' => false, 'message' => __('Permission denied.', 'wecoza-clients'))));
+        }
+
+        $parentSiteId = isset($_GET['parent_site_id']) ? (int) $_GET['parent_site_id'] : 0;
+        if ($parentSiteId <= 0) {
+            wp_die(json_encode(array('success' => false, 'message' => __('Invalid parent site ID.', 'wecoza-clients'))));
+        }
+
+        $subSites = $this->getSitesModel()->getSubSites($parentSiteId);
+        wp_die(json_encode(array('success' => true, 'data' => $subSites)));
+    }
+
+    /**
+     * AJAX handler to delete a sub-site
+     */
+    public function ajaxDeleteSubSite() {
+        check_ajax_referer('wecoza_clients_ajax', 'nonce');
+
+        if (!current_user_can('delete_wecoza_clients')) {
+            wp_die(json_encode(array('success' => false, 'message' => __('Permission denied.', 'wecoza-clients'))));
+        }
+
+        $siteId = isset($_POST['site_id']) ? (int) $_POST['site_id'] : 0;
+        $clientId = isset($_POST['client_id']) ? (int) $_POST['client_id'] : 0;
+
+        if ($siteId <= 0 || $clientId <= 0) {
+            wp_die(json_encode(array('success' => false, 'message' => __('Invalid request parameters.', 'wecoza-clients'))));
+        }
+
+        $deleted = $this->getSitesModel()->deleteSubSite($siteId, $clientId);
+        if (!$deleted) {
+            wp_die(json_encode(array('success' => false, 'message' => __('Failed to delete sub-site. Please try again.', 'wecoza-clients'))));
+        }
+
+        wp_die(json_encode(array(
+            'success' => true,
+            'message' => __('Sub-site deleted successfully!', 'wecoza-clients')
+        )));
+    }
+
+    /**
+     * AJAX handler to get all sites with hierarchy for a client
+     */
+    public function ajaxGetSitesHierarchy() {
+        check_ajax_referer('wecoza_clients_ajax', 'nonce');
+
+        if (!current_user_can('view_wecoza_clients')) {
+            wp_die(json_encode(array('success' => false, 'message' => __('Permission denied.', 'wecoza-clients'))));
+        }
+
+        $clientId = isset($_GET['client_id']) ? (int) $_GET['client_id'] : 0;
+        if ($clientId <= 0) {
+            wp_die(json_encode(array('success' => false, 'message' => __('Invalid client ID.', 'wecoza-clients'))));
+        }
+
+        $sites = $this->getSitesModel()->getAllSitesWithHierarchy($clientId);
+        wp_die(json_encode(array('success' => true, 'data' => $sites)));
     }
 }

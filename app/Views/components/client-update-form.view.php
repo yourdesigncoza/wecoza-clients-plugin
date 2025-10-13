@@ -19,7 +19,6 @@ $location_selected = $location_data['selected'] ?? array();
 $location_hierarchy = $location_data['hierarchy'] ?? array();
 $sites = $sites ?? array('head' => null, 'sub_sites' => array());
 $main_clients = $main_clients ?? array();
-$contact_defaults = isset($contact_defaults) && is_array($contact_defaults) ? $contact_defaults : array();
 $is_update_mode = $is_update_mode ?? false;
 
 // Sub-client variables
@@ -94,11 +93,11 @@ $has_location = !empty($selected_location_id);
 
 $is_edit = !empty($client['id']);
 
-$resolved_contact_person = $client['contact_person'] ?? ($contact_defaults['name'] ?? '');
-$resolved_contact_email = $client['contact_person_email'] ?? ($contact_defaults['email'] ?? '');
-$resolved_contact_cell = $client['contact_person_cellphone'] ?? ($contact_defaults['cellphone'] ?? '');
-$resolved_contact_tel = $client['contact_person_tel'] ?? ($contact_defaults['telephone'] ?? '');
-$resolved_contact_position = $client['contact_person_position'] ?? ($contact_defaults['position'] ?? '');
+$resolved_contact_person = $client['contact_person'] ?? '';
+$resolved_contact_email = $client['contact_person_email'] ?? '';
+$resolved_contact_cell = $client['contact_person_cellphone'] ?? '';
+$resolved_contact_tel = $client['contact_person_tel'] ?? '';
+$resolved_contact_position = $client['contact_person_position'] ?? '';
 ?>
 
 <div class="wecoza-clients-form-container">
@@ -138,15 +137,6 @@ $resolved_contact_position = $client['contact_person_position'] ?? ($contact_def
                 )
             );
             
-            echo ViewHelpers::renderField('text', 'site_name', 'Site Name', 
-                $headSiteName, 
-                array(
-                    'required' => true,
-                    'col_class' => 'col-md-3',
-                    'error' => $errors['site_name'] ?? ''
-                )
-            );
-            
             echo ViewHelpers::renderField('text', 'company_registration_nr', 'Company Registration Nr', 
                 $client['company_registration_nr'] ?? '', 
                 array(
@@ -156,6 +146,22 @@ $resolved_contact_position = $client['contact_person_position'] ?? ($contact_def
                 )
             );
             ?>
+        </div>
+        
+        <!-- Site Information -->
+        <div class="row mt-3">
+            <div class="col-3">
+                <?php
+                echo ViewHelpers::renderField('text', 'site_name', 'Site Name', 
+                    $headSiteName, 
+                    array(
+                        'required' => true,
+                        'col_class' => '',
+                        'error' => $errors['site_name'] ?? ''
+                    )
+                );
+                ?>
+            </div>
         </div>
         
         <!-- Sub-Client Information -->
@@ -480,6 +486,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     }
+
 
     // Province/Town/Suburb cascade
     const provinceSelect = document.querySelector('.js-province-select');

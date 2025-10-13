@@ -21,6 +21,12 @@ class ClientsModel {
         'financial_year_end' => ['financial_year_end'],
         'bbbee_verification_date' => ['bbbee_verification_date'],
         'main_client_id' => ['main_client_id'],
+        'client_town_id' => ['client_town_id'],
+        'contact_person' => ['contact_person'],
+        'contact_person_email' => ['contact_person_email'],
+        'contact_person_cellphone' => ['contact_person_cellphone'],
+        'contact_person_tel' => ['contact_person_tel'],
+        'contact_person_position' => ['contact_person_position'],
         'created_at' => ['created_at'],
         'updated_at' => ['updated_at'],
     ];
@@ -37,6 +43,12 @@ class ClientsModel {
         'financial_year_end',
         'bbbee_verification_date',
         'main_client_id',
+        'client_town_id', // Reference to place_id in locations table
+        'contact_person',
+        'contact_person_email',
+        'contact_person_cellphone',
+        'contact_person_tel',
+        'contact_person_position',
         'created_at',
         'updated_at',
     ];
@@ -47,8 +59,6 @@ class ClientsModel {
         'financial_year_end',
         'bbbee_verification_date',
     ];
-
-    protected $contactsModel;
 
     protected $communicationsModel;
 
@@ -69,7 +79,6 @@ class ClientsModel {
 
         $this->resolvedPrimaryKey = $this->columnMap['id'] ?: 'id';
 
-        $this->contactsModel = new ClientContactsModel();
         $this->communicationsModel = new ClientCommunicationsModel();
         $this->sitesModel = new SitesModel();
 
@@ -207,7 +216,7 @@ class ClientsModel {
             return;
         }
 
-        $contacts = $this->contactsModel->getPrimaryContacts($clientIds);
+
         $communications = $this->communicationsModel->getLatestCommunicationTypes($clientIds);
 
         foreach ($rows as &$row) {
@@ -216,20 +225,7 @@ class ClientsModel {
                 continue;
             }
 
-            if (isset($contacts[$clientId])) {
-                $contact = $contacts[$clientId];
-                $nameParts = array_filter([
-                    $contact['first_name'] ?? '',
-                    $contact['surname'] ?? '',
-                ]);
-
-                $row['contact_person'] = implode(' ', $nameParts);
-                $row['contact_person_email'] = $contact['email'] ?? '';
-                $row['contact_person_cellphone'] = $contact['cellphone_number'] ?? '';
-                $row['contact_person_tel'] = $contact['tel_number'] ?? '';
-                $row['contact_person_position'] = $contact['position'] ?? '';
-                $row['contact_site_id'] = isset($contact['site_id']) ? (int) $contact['site_id'] : null;
-            }
+    
 
             if (isset($communications[$clientId])) {
                 $row['last_communication_at'] = $communications[$clientId]['communication_date'];
@@ -572,9 +568,7 @@ class ClientsModel {
         return $this->sitesModel;
     }
 
-    public function getContactsModel() {
-        return $this->contactsModel;
-    }
+
 
     public function getCommunicationsModel() {
         return $this->communicationsModel;

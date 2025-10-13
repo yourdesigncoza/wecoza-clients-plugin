@@ -1,0 +1,5 @@
+1. Use the provided @schema/wecoza_db_schema_oct_12.sql dump to catalogue the `sites`, `locations`, and related objects (indexes, triggers, views, constraints) for authoritative context. 
+2. Summarize how `address`, `address_line_1`, and `address_line_2` are referenced in application code (models/controllers/views) and determine whether the legacy `address` column is still needed alongside `locations` data. 
+3. Evaluate `parent_site_id` usage across PHP code, database triggers, views, and constraints to judge whether hierarchical sites are active or vestigial. 
+4. Document how `place_id` powers location hydration, validation, and downstream relationships (client contact linkage, communications, etc.) to confirm its necessity. 
+5. Compile observations and actionable recommendations—including proposed schema clean-up steps and cautionary notes—in `docs/thoughts.md` for the user’s review.
