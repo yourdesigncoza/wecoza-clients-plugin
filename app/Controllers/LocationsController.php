@@ -256,16 +256,7 @@ class LocationsController {
     }
 
     protected function getGoogleMapsApiKey() {
-        $apiKey = getenv('GOOGLE_MAPS_API_KEY');
-        if (!empty($apiKey)) {
-            return $apiKey;
-        }
-
-        if (defined('GOOGLE_MAPS_API_KEY') && !empty(GOOGLE_MAPS_API_KEY)) {
-            return GOOGLE_MAPS_API_KEY;
-        }
-
-        $optionKey = get_option('wecoza_agents_google_maps_api_key');
+        $optionKey = get_option('wecoza_google_maps_api_key');
         return !empty($optionKey) ? $optionKey : '';
     }
 

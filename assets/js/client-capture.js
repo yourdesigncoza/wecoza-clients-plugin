@@ -150,10 +150,8 @@
         var townWrapper = form.find('.js-town-field');
         var suburbWrapper = form.find('.js-suburb-field');
         var addressWrapper = form.find('.js-address-field');
-        var address2Wrapper = form.find('.js-address-2-field');
         var postalWrapper = form.find('.js-postal-field');
         var addressInput = addressWrapper.find('input[name="client_street_address"]');
-        var address2Input = address2Wrapper.find('input[name="client_address_line_2"]');
         var postalInput = postalWrapper.find('input[name="client_postal_code"]');
         var suburbHidden = form.find('.js-suburb-hidden');
         var townHidden = form.find('.js-town-hidden');
@@ -317,7 +315,6 @@
         var showAddressWrapper = function () {
             addressWrapper.removeClass('d-none');
             toggleRequired(addressInput, true);
-            address2Wrapper.removeClass('d-none');
         };
 
         var hideAddressWrapper = function (clearValue) {
@@ -327,12 +324,6 @@
                 addressInput.val('');
                 addressInput.prop('readonly', false);
                 addressInput.removeAttr('title');
-            }
-            address2Wrapper.addClass('d-none');
-            if (clearValue && address2Input.length) {
-                address2Input.val('');
-                address2Input.prop('readonly', false);
-                address2Input.removeAttr('title');
             }
         };
 
@@ -386,13 +377,6 @@
             } else if (addressInput.length) {
                 addressInput.prop('readonly', false);
                 addressInput.removeAttr('title');
-            }
-            
-            // Clear and make address line 2 readonly since it's not in location data
-            if (address2Input.length) {
-                address2Input.val('');
-                address2Input.prop('readonly', true);
-                address2Input.attr('title', 'Address line 2 is managed by location system');
             }
 
             showPostalWrapper();

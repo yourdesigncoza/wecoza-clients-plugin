@@ -524,16 +524,25 @@ class SitesModel {
             $row['head_site'] = $site;
             $row['site_id'] = $site['site_id'];
             $row['site_name'] = $site['site_name'];
-            $row['client_street_address'] = $site['address_line_1'] ?? '';
-            $row['client_address_line_2'] = $site['address_line_2'] ?? '';
             $row['client_town_id'] = $site['place_id'];
+            
+            // Get address data from location
             if (!empty($site['location'])) {
                 $location = $site['location'];
+                $row['client_street_address'] = $location['street_address'] ?? '';
                 $row['client_suburb'] = $location['suburb'] ?? '';
                 $row['client_postal_code'] = $location['postal_code'] ?? '';
                 $row['client_province'] = $location['province'] ?? '';
                 $row['client_town'] = $location['town'] ?? '';
                 $row['client_location'] = $location;
+            } else {
+                // No location data available
+                $row['client_street_address'] = '';
+                $row['client_suburb'] = '';
+                $row['client_postal_code'] = '';
+                $row['client_province'] = '';
+                $row['client_town'] = '';
+                $row['client_location'] = null;
             }
         }
         unset($row);

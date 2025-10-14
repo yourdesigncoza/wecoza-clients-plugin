@@ -753,18 +753,7 @@ function deleteClient(clientId, clientName) {
                                 <table class="w-100 table-stats table table-hover table-sm fs-9 mb-0">
                                     <tbody>
                                         <tr>
-                                            <td class="py-2">
-                                                <div class="d-flex align-items-center">
-                                                    <div class="d-flex bg-secondary-subtle rounded-circle flex-center me-3" style="width:24px; height:24px">
-                                                        <i class="bi bi-info-circle text-secondary" style="font-size: 12px;"></i>
-                                                    </div>
-                                                    <p class="fw-bold mb-0">Address Line 2 :</p>
-                                                </div>
-                                            </td>
-                                            <td class="py-2">
-                                                <p class="fw-semibold mb-0" id="modalAddressLine2"></p>
-                                            </td>
-                                        </tr>
+                                            
                                     </tbody>
                                 </table>
                             </div>

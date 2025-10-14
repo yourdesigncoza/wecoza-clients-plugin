@@ -224,7 +224,6 @@
         $('#modalBBBEEVerificationDate').text(client.bbbee_verification_date || 'N/A');
         $('#modalCreatedDate').text(formatDate(client.created_at));
         $('#modalUpdatedDate').text(formatDate(client.updated_at));
-        $('#modalAddressLine2').text(client.client_address_line_2 || 'N/A');
     }
 
     function showError(message) {

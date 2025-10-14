@@ -31,7 +31,6 @@ $headSite = $sites['head'] ?? null;
 $headSiteId = $headSite['site_id'] ?? ($client['site_id'] ?? '');
 $headSiteName = $headSite['site_name'] ?? ($client['site_name'] ?? ($client['client_name'] ?? ''));
 $headSiteAddress1 = $headSite['address_line_1'] ?? ($client['client_street_address'] ?? '');
-$headSiteAddress2 = $headSite['address_line_2'] ?? ($client['client_address_line_2'] ?? '');
 
 $selected_province = $location_selected['province'] ?? ($client['client_province'] ?? '');
 $selected_town = $location_selected['town'] ?? ($client['client_town'] ?? '');
@@ -276,15 +275,7 @@ $resolved_contact_position = $client['contact_person_position'] ?? '';
                 )
             );
 
-            echo ViewHelpers::renderField('text', 'client_address_line_2', 'Address Line 2', 
-                $headSiteAddress2, 
-                array(
-                    'readonly' => $has_location,
-                    'title' => $has_location ? 'Address line 2 is managed by location system' : '',
-                    'col_class' => 'col-md-3 js-address-2-field' . ($has_location ? '' : ' d-none'),
-                    'error' => $errors['site_address_line_2'] ?? ''
-                )
-            );
+            
             ?>
         </div>
         
@@ -494,7 +485,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const suburbSelect = document.querySelector('.js-suburb-select');
     const postalField = document.querySelector('.js-postal-field');
     const addressField = document.querySelector('.js-address-field');
-    const address2Field = document.querySelector('.js-address-2-field');
     
     const locationData = <?php echo json_encode($location_hierarchy); ?>;
     
@@ -512,7 +502,6 @@ document.addEventListener('DOMContentLoaded', function() {
         suburbSelect.closest('.js-suburb-field').classList.add('d-none');
         postalField.classList.add('d-none');
         addressField.classList.add('d-none');
-        address2Field.classList.add('d-none');
         
         if (towns.length > 0) {
             towns.forEach(town => {
@@ -541,7 +530,6 @@ document.addEventListener('DOMContentLoaded', function() {
         suburbSelect.closest('.js-suburb-field').classList.add('d-none');
         postalField.classList.add('d-none');
         addressField.classList.add('d-none');
-        address2Field.classList.add('d-none');
         
         if (suburbs.length > 0) {
             suburbs.forEach(suburb => {
@@ -551,7 +539,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 option.dataset.postalCode = suburb.postal_code || '';
                 option.dataset.suburb = suburb.name || '';
                 option.dataset.address = suburb.address || '';
-                option.dataset.address2 = suburb.address_line_2 || '';
                 suburbSelect.appendChild(option);
             });
             
@@ -564,37 +551,31 @@ document.addEventListener('DOMContentLoaded', function() {
         const selectedOption = suburbSelect.options[suburbSelect.selectedIndex];
         const postalCodeInput = document.querySelector('input[name="client_postal_code"]');
         const streetAddressInput = document.querySelector('input[name="client_street_address"]');
-        const address2Input = document.querySelector('input[name="client_address_line_2"]');
         const suburbHidden = document.querySelector('.js-suburb-hidden');
         const townHidden = document.querySelector('.js-town-hidden');
         
         if (selectedOption && selectedOption.value) {
             const postalCode = selectedOption.dataset.postalCode || '';
             const address = selectedOption.dataset.address || '';
-            const address2 = selectedOption.dataset.address2 || '';
             const suburb = selectedOption.dataset.suburb || '';
             const town = townSelect.value || '';
             
             // Update field values
             postalCodeInput.value = postalCode;
             streetAddressInput.value = address;
-            address2Input.value = address2;
             suburbHidden.value = suburb;
             townHidden.value = town;
             
             // Show postal and address fields
             postalField.classList.remove('d-none');
             addressField.classList.remove('d-none');
-            address2Field.classList.remove('d-none');
         } else {
             // Hide fields and clear values
             postalField.classList.add('d-none');
             addressField.classList.add('d-none');
-            address2Field.classList.add('d-none');
             
             postalCodeInput.value = '';
             streetAddressInput.value = '';
-            address2Input.value = '';
             suburbHidden.value = '';
             townHidden.value = '';
         }

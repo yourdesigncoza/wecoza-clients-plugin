@@ -30,7 +30,6 @@ $headSite = $sites['head'] ?? null;
 $headSiteId = $headSite['site_id'] ?? ($client['site_id'] ?? '');
 $headSiteName = $headSite['site_name'] ?? ($client['site_name'] ?? ($client['client_name'] ?? ''));
 $headSiteAddress1 = $headSite['address_line_1'] ?? ($client['client_street_address'] ?? '');
-$headSiteAddress2 = $headSite['address_line_2'] ?? ($client['client_address_line_2'] ?? '');
 
 $selected_province = $location_selected['province'] ?? ($client['client_province'] ?? '');
 $selected_town = $location_selected['town'] ?? ($client['client_town'] ?? '');
@@ -144,10 +143,7 @@ $is_edit = !empty($client['id']);
                 )
             );
             ?>
-        </div>
-        
-        <!-- Site Information -->
-        <div class="row mt-3">
+            <!-- Site Information -->
             <div class="col-3">
                 <?php
                 echo ViewHelpers::renderField('text', 'site_name', 'Site Name', 
@@ -160,6 +156,7 @@ $is_edit = !empty($client['id']);
                 );
                 ?>
             </div>
+
         </div>
         
         <!-- Sub-Client Information -->
@@ -275,15 +272,7 @@ $is_edit = !empty($client['id']);
                 )
             );
 
-            echo ViewHelpers::renderField('text', 'client_address_line_2', 'Address Line 2', 
-                $headSiteAddress2, 
-                array(
-                    'readonly' => $has_location,
-                    'title' => $has_location ? 'Address line 2 is managed by location system' : '',
-                    'col_class' => 'col-md-3 js-address-2-field' . ($has_location ? '' : ' d-none'),
-                    'error' => $errors['site_address_line_2'] ?? ''
-                )
-            );
+            
             ?>
         </div>
         
