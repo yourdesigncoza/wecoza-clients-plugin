@@ -56,25 +56,20 @@
         }
 
         function initializeAutocomplete() {
-            try {
-                if (google.maps.importLibrary) {
-                    google.maps.importLibrary('places').then(function (library) {
-                        if (library && library.PlaceAutocompleteElement) {
-                            initializeNewAutocomplete(library.PlaceAutocompleteElement);
-                        } else {
-                            initializeLegacyAutocomplete();
-                        }
-                    }).catch(function (error) {
-                        console.error('PlaceAutocompleteElement failed to load', error);
-                        initializeLegacyAutocomplete();
-                    });
-                } else {
-                    initializeLegacyAutocomplete();
-                }
-            } catch (error) {
-                console.error('Failed to initialise Google Places', error);
-                initializeLegacyAutocomplete();
+            if (!google.maps.importLibrary) {
+                console.error('Google Maps importLibrary not available - please ensure modern Google Maps API is loaded');
+                return;
             }
+
+            google.maps.importLibrary('places').then(function (library) {
+                if (!library || !library.PlaceAutocompleteElement) {
+                    console.error('PlaceAutocompleteElement not available - please ensure modern Google Maps API is loaded');
+                    return;
+                }
+                initializeNewAutocomplete(library.PlaceAutocompleteElement);
+            }).catch(function (error) {
+                console.error('Failed to load Google Places library', error);
+            });
         }
 
         function initializeNewAutocomplete(PlaceAutocompleteElement) {
@@ -114,30 +109,7 @@
             });
         }
 
-        function initializeLegacyAutocomplete() {
-            var input = document.getElementById('google_address_search');
-            if (!input) {
-                return;
-            }
-
-            input.style.display = 'block';
-            input.style.visibility = 'visible';
-
-            var autocomplete = new google.maps.places.Autocomplete(input, {
-                componentRestrictions: { country: 'za' },
-                fields: ['address_components', 'geometry', 'formatted_address']
-            });
-
-            autocomplete.addListener('place_changed', function () {
-                var place = autocomplete.getPlace();
-                if (!place || !place.address_components) {
-                    return;
-                }
-
-                var location = place.geometry && place.geometry.location ? place.geometry.location : null;
-                populateFromPlace(place.address_components, location);
-            });
-        }
+        
 
         function populateFromPlace(components, location) {
             var data = {
