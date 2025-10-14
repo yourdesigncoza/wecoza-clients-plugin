@@ -15,7 +15,7 @@ foreach ($provinces as $province) {
 
 ?>
 
-<div class="wecoza-locations-form-container">
+<div class="wecoza-clients-form-container">
     <h4 class="mb-3">Capture a Location</h4>
     <p class="mb-4 text-muted">Use the form below to add new locations for suburbs and towns across South Africa.</p>
 
@@ -43,9 +43,9 @@ foreach ($provinces as $province) {
 
         <div class="row mb-4">
             <div class="col-12">
-                <label for="google_address_search" class="form-label">Search Address</label>
-                <div id="google_address_container" class="position-relative">
-                    <input type="text" id="google_address_search" class="form-control form-control-sm" placeholder="Start typing an address...">
+                <label for="wecoza_clients_google_address_search" class="form-label">Search Address</label>
+                <div id="wecoza_clients_google_address_container" class="position-relative">
+                    <input type="text" id="wecoza_clients_google_address_search" class="form-control form-control-sm" placeholder="Start typing an address...">
                     <div id="address_search_loading" class="position-absolute end-0 top-50 translate-middle-y me-2 d-none">
                         <div class="spinner-border spinner-border-sm" role="status">
                             <span class="visually-hidden">Loading...</span>

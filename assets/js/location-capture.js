@@ -1,11 +1,26 @@
 (function ($) {
     $(function () {
-        var config = window.wecoza_locations || {};
-        var container = document.getElementById('google_address_container');
-        var searchInput = document.getElementById('google_address_search');
-        var form = $('.wecoza-locations-form-container form');
+        // Create namespace to avoid conflicts with other plugins
+        if (typeof window.WeCozaClients === 'undefined') {
+            window.WeCozaClients = {};
+        }
+        if (typeof window.WeCozaClients.Location === 'undefined') {
+            window.WeCozaClients.Location = {
+                initialized: false
+            };
+        }
 
-        if (!form.length || !container || !searchInput) {
+        // Prevent multiple initialization
+        if (window.WeCozaClients.Location.initialized) {
+            return;
+        }
+
+        var config = window.wecoza_locations || {};
+        var container = document.getElementById('wecoza_clients_google_address_container');
+        var searchInput = document.getElementById('wecoza_clients_google_address_search');
+        var form = $('.wecoza-clients-form-container form');
+
+        if (!form.length || !container || !searchInput || !config.googleMapsEnabled) {
             return;
         }
 
@@ -24,15 +39,8 @@
             });
         }
 
-        if (!config.googleMapsEnabled) {
-            return;
-        }
-
-        waitForGoogleMaps(function () {
-            initializeAutocomplete();
-        });
-
-        function waitForGoogleMaps(callback) {
+        // WeCozaClients.Location methods
+        window.WeCozaClients.Location.waitForGoogleMaps = function (callback) {
             var attempts = 0;
             var maxAttempts = 60;
 
@@ -53,9 +61,9 @@
             }
 
             check();
-        }
+        };
 
-        function initializeAutocomplete() {
+        window.WeCozaClients.Location.initializeAutocomplete = function () {
             if (!google.maps.importLibrary) {
                 console.error('Google Maps importLibrary not available - please ensure modern Google Maps API is loaded');
                 return;
@@ -66,14 +74,14 @@
                     console.error('PlaceAutocompleteElement not available - please ensure modern Google Maps API is loaded');
                     return;
                 }
-                initializeNewAutocomplete(library.PlaceAutocompleteElement);
+                window.WeCozaClients.Location.initializeNewAutocomplete(library.PlaceAutocompleteElement);
             }).catch(function (error) {
                 console.error('Failed to load Google Places library', error);
             });
-        }
+        };
 
-        function initializeNewAutocomplete(PlaceAutocompleteElement) {
-            var originalInput = document.getElementById('google_address_search');
+        window.WeCozaClients.Location.initializeNewAutocomplete = function (PlaceAutocompleteElement) {
+            var originalInput = document.getElementById('wecoza_clients_google_address_search');
             if (!originalInput) {
                 return;
             }
@@ -102,16 +110,24 @@
                 place.fetchFields({
                     fields: ['addressComponents', 'formattedAddress', 'location']
                 }).then(function () {
-                    populateFromPlace(place.addressComponents || [], place.location || null);
+                    window.WeCozaClients.Location.populateFromPlace(place.addressComponents || [], place.location || null);
                 }).catch(function (error) {
                     console.error('Failed fetching place fields', error);
                 });
+            });
+        };
+
+        // Initialize if all required elements exist and config is valid
+        if (form.length && container && searchInput && config.googleMapsEnabled) {
+            window.WeCozaClients.Location.initialized = true;
+            window.WeCozaClients.Location.waitForGoogleMaps(function () {
+                window.WeCozaClients.Location.initializeAutocomplete();
             });
         }
 
         
 
-        function populateFromPlace(components, location) {
+        window.WeCozaClients.Location.populateFromPlace = function (components, location) {
             var data = {
                 streetAddress: '',
                 suburb: '',
