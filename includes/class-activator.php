@@ -62,10 +62,10 @@ class WeCoza_Clients_Activator {
 
         // PostgreSQL connection settings (if not already set)
         if (!get_option('wecoza_postgres_host')) {
-            update_option('wecoza_postgres_host', 'db-wecoza-3-do-user-17263152-0.m.db.ondigitalocean.com');
-            update_option('wecoza_postgres_port', '25060');
-            update_option('wecoza_postgres_dbname', 'defaultdb');
-            update_option('wecoza_postgres_user', 'doadmin');
+            update_option('wecoza_postgres_host', '');
+            update_option('wecoza_postgres_port', '');
+            update_option('wecoza_postgres_dbname', '');
+            update_option('wecoza_postgres_user', '');
             // Password should be set manually for security
         }
 

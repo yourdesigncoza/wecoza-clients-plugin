@@ -45,10 +45,10 @@ return array(
         'collate' => 'utf8mb4_unicode_ci',
         // PostgreSQL connection settings (can be overridden via WordPress options)
         'postgresql' => array(
-            'host' => get_option('wecoza_postgres_host', 'db-wecoza-3-do-user-17263152-0.m.db.ondigitalocean.com'),
-            'port' => get_option('wecoza_postgres_port', '25060'),
-            'dbname' => get_option('wecoza_postgres_dbname', 'defaultdb'),
-            'user' => get_option('wecoza_postgres_user', 'doadmin'),
+            'host' => get_option('wecoza_postgres_host', ''),
+            'port' => get_option('wecoza_postgres_port', ''),
+            'dbname' => get_option('wecoza_postgres_dbname', ''),
+            'user' => get_option('wecoza_postgres_user', ''),
             'password' => get_option('wecoza_postgres_password', ''),
         ),
     ),

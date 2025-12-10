@@ -161,10 +161,10 @@ Capabilities checked in controllers before any operation:
 
 ### PostgreSQL Connection Configuration
 Stored as WordPress options (set during activation):
-- `wecoza_postgres_host`: db-wecoza-3-do-user-17263152-0.m.db.ondigitalocean.com
-- `wecoza_postgres_port`: 25060
-- `wecoza_postgres_dbname`: defaultdb
-- `wecoza_postgres_user`: doadmin
+- `wecoza_postgres_host`: 
+- `wecoza_postgres_port`: 
+- `wecoza_postgres_dbname`: 
+- `wecoza_postgres_user`: 
 - `wecoza_postgres_password`: (must be set manually)
 
 ### Common Development Tasks
